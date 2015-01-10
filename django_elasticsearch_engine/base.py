@@ -9,6 +9,11 @@ from djangotoolbox.db.base import (
     NonrelDatabaseCreation
 )
 
+try:
+    from django.db.backends.schema import BaseDatabaseSchemaEditor
+except ImportError:
+    BaseDatabaseSchemaEditor = object
+
 import pyes
 
 
@@ -61,6 +66,15 @@ class DatabaseIntrospection(NonrelDatabaseIntrospection):
 
 class DatabaseCreation(NonrelDatabaseCreation):
     pass
+
+
+class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
+
+    def create_model(self, model):
+        pass
+
+    def delete_model(self, model):
+        pass
 
 
 class DatabaseWrapper(NonrelDatabaseWrapper):
@@ -118,11 +132,8 @@ class DatabaseWrapper(NonrelDatabaseWrapper):
     def _rollback(self):
         pass
 
-    '''def _cursor(self):
-        return CursorWrapper(self.connection.cursor(), self)
-
     def schema_editor(self, *args, **kwargs):
         """
         Returns a new instance of this backend's SchemaEditor (Django>=1.7)
         """
-        return DatabaseSchemaEditor(self, *args, **kwargs)'''
+        return DatabaseSchemaEditor(self, *args, **kwargs)
