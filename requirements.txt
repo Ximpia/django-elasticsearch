@@ -1,4 +1,4 @@
-Django==1.6.8
+-e git+https://github.com/django-nonrel/django.git@0859303e6989e5ac3939cad724a6fa46928148a5#egg=Django-nonrel-1.6
 djangotoolbox==1.6.2
 pyes==0.99.5
 six==1.9.0
