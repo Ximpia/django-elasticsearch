@@ -1,4 +1,6 @@
 from django.db.backends import connection_created
+from creation import DatabaseCreation
+from schema import DatabaseSchemaEditor
 from djangotoolbox.db.base import (
     NonrelDatabaseClient,
     NonrelDatabaseFeatures,
@@ -6,13 +8,8 @@ from djangotoolbox.db.base import (
     NonrelDatabaseOperations,
     NonrelDatabaseValidation,
     NonrelDatabaseWrapper,
-    NonrelDatabaseCreation
 )
 
-try:
-    from django.db.backends.schema import BaseDatabaseSchemaEditor
-except ImportError:
-    BaseDatabaseSchemaEditor = object
 
 import pyes
 
@@ -64,19 +61,6 @@ class DatabaseIntrospection(NonrelDatabaseIntrospection):
         pass
 
 
-class DatabaseCreation(NonrelDatabaseCreation):
-    pass
-
-
-class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
-
-    def create_model(self, model):
-        pass
-
-    def delete_model(self, model):
-        pass
-
-
 class DatabaseWrapper(NonrelDatabaseWrapper):
 
     vendor = 'elasticsearch'
@@ -103,11 +87,6 @@ class DatabaseWrapper(NonrelDatabaseWrapper):
             self.connection = pyes.ES('{}:{}'.format(self.settings_dict['HOST'], self.settings_dict['PORT']),
                                       default_indices=[self.settings_dict['NAME']])
             connection_created.send(sender=self.__class__, connection=self)
-            # TODO: Define where to crete main index syncdb elastic_syncdb or similar????
-            '''try:
-                self.connection.indices.create_index(self.settings_dict['NAME'])
-            except:
-                pass'''
             self.connected = True
 
     def __getattr__(self, attr):
