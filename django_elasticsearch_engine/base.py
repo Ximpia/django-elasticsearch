@@ -79,13 +79,13 @@ class DatabaseWrapper(NonrelDatabaseWrapper):
         self.commit_on_exit = False
         self.connected = False
         self.autocommit = True
+        self.es_url = '{}:{}'.format(self.settings_dict['HOST'], self.settings_dict['PORT'])
 
         del self.connection
 
     def connect(self):
         if not self.connected or self.connection is None:
-            self.connection = pyes.ES('{}:{}'.format(self.settings_dict['HOST'], self.settings_dict['PORT']),
-                                      default_indices=[self.settings_dict['NAME']])
+            self.connection = pyes.ES(self.es_url, default_indices=[self.settings_dict['NAME']])
             connection_created.send(sender=self.__class__, connection=self)
             self.connected = True
 
