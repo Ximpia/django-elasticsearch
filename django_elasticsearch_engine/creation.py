@@ -34,6 +34,11 @@ class DatabaseCreation(NonrelDatabaseCreation):
         'RelatedAutoField':             'string',
         'OneToOneField':                'string',
         'DecimalField':                 'decimal',
+        'AbstractIterableField':        'nested',
+        'ListField':                    'nested',
+        'SetField':                     'nested',
+        'DictField':                    'object',
+        'EmbeddedModelField':           'object',
     }
 
     def sql_indexes_for_field(self, model, f, style):
