@@ -7,96 +7,75 @@ __author__ = 'jorgealegre'
 
 class DatabaseCreation(NonrelDatabaseCreation):
     data_types = {
-        'DateTimeField':                'datetime',
+        'DateTimeField':                'date',
         'DateField':                    'date',
         'TimeField':                    'time',
         'FloatField':                   'float',
-        'EmailField':                   'unicode',
-        'URLField':                     'unicode',
+        'EmailField':                   'string',
+        'URLField':                     'string',
         'BooleanField':                 'bool',
         'NullBooleanField':             'bool',
-        'CharField':                    'unicode',
-        'CommaSeparatedIntegerField':   'unicode',
-        'IPAddressField':               'unicode',
-        'SlugField':                    'unicode',
-        'FileField':                    'unicode',
-        'FilePathField':                'unicode',
-        'TextField':                    'unicode',
-        'XMLField':                     'unicode',
-        'IntegerField':                 'int',
-        'SmallIntegerField':            'int',
-        'PositiveIntegerField':         'int',
-        'PositiveSmallIntegerField':    'int',
-        'BigIntegerField':              'int',
-        'GenericAutoField':             'unicode',
-        'StringForeignKey':             'unicode',
-        'AutoField':                    'unicode',
-        'RelatedAutoField':             'unicode',
-        'OneToOneField':                'int',
-        'DecimalField':                 'float',
+        'CharField':                    'string',
+        'CommaSeparatedIntegerField':   'string',
+        'IPAddressField':               'ip',
+        'SlugField':                    'string',
+        'FileField':                    'string',
+        'FilePathField':                'string',
+        'TextField':                    'string',
+        'XMLField':                     'string',
+        'IntegerField':                 'integer',
+        'SmallIntegerField':            'integer',
+        'PositiveIntegerField':         'integer',
+        'PositiveSmallIntegerField':    'integer',
+        'BigIntegerField':              'long',
+        'GenericAutoField':             'string',
+        'StringForeignKey':             'string',
+        'AutoField':                    'string',
+        'RelatedAutoField':             'string',
+        'OneToOneField':                'string',
+        'DecimalField':                 'decimal',
     }
 
     def sql_indexes_for_field(self, model, f, style):
-        """Not required. In ES all is index!!"""
         return []
 
     def index_fields_group(self, model, group, style):
-        """Not required. In ES all is index!!"""
         return []
 
     def sql_indexes_for_model(self, model, style):
-        """Not required. In ES all is index!!"""
         return []
 
     def sql_create_model(self, model, style, known_models=set()):
-        from mapping import model_to_mapping
-        mappings = model_to_mapping(model)
-        self.connection.db_connection.put_mapping(model._meta.db_table, {mappings.name:mappings.as_dict()})
+        """
+        Create mapping for model
+        """
+        # TODO: Define mappings in MappingFieldConvert classes, to define conversions like model fields
+        mapping = {}
+        self.connection.put_mapping(model._meta.db_table, mapping)
         return [], {}
 
-    def set_autocommit(self):
-        "Make sure a connection is in autocommit mode."
-        pass
-
     def create_test_db(self, verbosity=1, autoclobber=False):
-        # No need to create databases in mongoDB :)
-        # but we can make sure that if the database existed is emptied
         from django.core.management import call_command
-        if self.connection.settings_dict.get('TEST_NAME'):
-            test_database_name = self.connection.settings_dict['TEST_NAME']
-        elif 'NAME' in self.connection.settings_dict:
-            test_database_name = TEST_DATABASE_PREFIX + self.connection.settings_dict['NAME']
-        elif 'DATABASE_NAME' in self.connection.settings_dict:
-            if self.connection.settings_dict['DATABASE_NAME'].startswith(TEST_DATABASE_PREFIX):
-                # already been set up
-                # must be because this is called from a setUp() instead of something formal.
-                # suspect this Django 1.1
-                test_database_name = self.connection.settings_dict['DATABASE_NAME']
-            else:
-                test_database_name = TEST_DATABASE_PREFIX + \
-                  self.connection.settings_dict['DATABASE_NAME']
-        else:
-            raise ValueError("Name for test database not defined")
 
+        test_database_name = self._get_test_db_name()
         self.connection.settings_dict['NAME'] = test_database_name
-        # This is important. Here we change the settings so that all other code
-        # things that the chosen database is now the test database. This means
-        # that nothing needs to change in the test code for working with
-        # connections, databases and collections. It will appear the same as
-        # when working with non-test code.
 
-        # In this phase it will only drop the database if it already existed
-        # which could potentially happen if the test database was created but
-        # was never dropped at the end of the tests
+        if verbosity >= 1:
+            print("Creating test database for alias '{}'".format(self.connection.alias))
+
         try:
             self._drop_database(test_database_name)
         except NotFoundException:
             pass
 
-        self.connection.db_connection.create_index(test_database_name)
-        self.connection.db_connection.cluster_health(wait_for_status='green')
+        self.connection.indices.create_index(test_database_name)
+        self.connection.cluster.cluster_health(wait_for_status='green')
 
-        call_command('syncdb', verbosity=max(verbosity - 1, 0), interactive=False, database=self.connection.alias)
+        call_command('syncdb',
+                     verbosity=max(verbosity - 1, 0),
+                     interactive=False,
+                     database=self.connection.alias,
+                     load_initial_data=False)
 
     def destroy_test_db(self, old_database_name, verbosity=1):
         """
@@ -111,10 +90,10 @@ class DatabaseCreation(NonrelDatabaseCreation):
 
     def _drop_database(self, database_name):
         try:
-            self.connection.db_connection.delete_index(database_name)
+            self.connection.indices.delete_index(database_name)
         except NotFoundException:
             pass
-        self.connection.db_connection.cluster_health(wait_for_status='green')
+        self.connection.cluster.cluster_health(wait_for_status='green')
 
     def sql_destroy_model(self, model, references_to_delete, style):
         print model

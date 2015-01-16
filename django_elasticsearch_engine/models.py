@@ -1,6 +1,6 @@
 from django.db.models import signals
-from .fields import add_elasticsearch_manager
+from .manager import add_es_manager
 
 __author__ = 'jorgealegre'
 
-signals.class_prepared.connect(add_elasticsearch_manager)
+signals.class_prepared.connect(add_es_manager())
