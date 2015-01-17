@@ -1,4 +1,5 @@
 from pyes import mappings
+import sys
 
 __author__ = 'jorgealegre'
 
@@ -9,12 +10,26 @@ def model_to_mapping(model):
 
     :return:
     """
+    meta = model._meta
     mapping = mappings.ObjectField()
-    # add fields from inspection to mapping
+    for field in meta.fields + meta.many_to_many:
+        field_type = type(field).__name__
+        field_mapping = getattr(sys.modules['__main__'], '{}Mapping'.format(field_type)).get(field)
+        if field_mapping:
+            mapping.add_property(field_mapping)
     return mapping
 
 
-class IntegerField(object):
+class IntegerFieldMapping(object):
 
-    def __init__(self):
-        pass
+    @classmethod
+    def get(cls, field):
+        """
+        Generate mapping for IntegerField
+
+        :param Field field: Django model field
+        :return: Elastic mapping for field
+        :rtype mappings.IntegerField
+        """
+        return mappings.IntegerField(name=field.name,
+                                     store=True)
