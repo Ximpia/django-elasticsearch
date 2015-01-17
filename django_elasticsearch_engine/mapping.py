@@ -1,4 +1,5 @@
 from pyes import mappings
+from abc import ABCMeta, abstractmethod
 import sys
 
 __author__ = 'jorgealegre'
@@ -20,7 +21,26 @@ def model_to_mapping(model):
     return mapping
 
 
-class IntegerFieldMapping(object):
+# define an abstract class with get method for FieldMapping
+
+
+class FieldMapping(object):
+    __metaclass__ = ABCMeta
+
+    @classmethod
+    @abstractmethod
+    def get(cls, field):
+        """
+        Generate mapping for Field
+
+        :param Field field: Django model field
+        :return: Elastic mapping for field
+        :rtype mappings.IntegerField
+        """
+        pass
+
+
+class IntegerFieldMapping(FieldMapping):
 
     @classmethod
     def get(cls, field):
@@ -33,3 +53,59 @@ class IntegerFieldMapping(object):
         """
         return mappings.IntegerField(name=field.name,
                                      store=True)
+
+
+class PositiveSmallIntegerFieldMapping(FieldMapping):
+
+    @classmethod
+    def get(cls, field):
+        pass
+
+
+class SmallIntegerFieldMapping(FieldMapping):
+
+    @classmethod
+    def get(cls, field):
+        pass
+
+
+class PositiveIntegerFieldMapping(FieldMapping):
+
+    @classmethod
+    def get(cls, field):
+        pass
+
+
+class PositionFieldMapping(FieldMapping):
+
+    @classmethod
+    def get(cls, field):
+        pass
+
+
+class FloatFieldMapping(FieldMapping):
+
+    @classmethod
+    def get(cls, field):
+        pass
+
+
+class DecimalFieldMapping(FieldMapping):
+
+    @classmethod
+    def get(cls, field):
+        pass
+
+
+class BooleanFieldMapping(FieldMapping):
+
+    @classmethod
+    def get(cls, field):
+        pass
+
+
+class NullBooleanFieldMapping(FieldMapping):
+
+    @classmethod
+    def get(cls, field):
+        pass
