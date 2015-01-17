@@ -1,5 +1,6 @@
 from djangotoolbox.db.base import NonrelDatabaseCreation
 from pyes.exceptions import NotFoundException
+from mapping import model_to_mapping
 TEST_DATABASE_PREFIX = 'test_'
 
 __author__ = 'jorgealegre'
@@ -53,13 +54,18 @@ class DatabaseCreation(NonrelDatabaseCreation):
     def sql_create_model(self, model, style, known_models=set()):
         """
         Create mapping for model
+
+        :param model
+        :param style
+        :param known_models
+        :rtype list, dict
         """
-        # TODO: Define mappings in MappingFieldConvert classes, to define conversions like model fields
-        mapping = {}
-        self.connection.put_mapping(model._meta.db_table, mapping)
+        self.connection.put_mapping(model._meta.db_table, model_to_mapping(model).as_dict())
         return [], {}
 
     def create_test_db(self, verbosity=1, autoclobber=False):
+        """
+        """
         from django.core.management import call_command
 
         test_database_name = self._get_test_db_name()
