@@ -11,7 +11,7 @@ from djangotoolbox.db.base import (
 )
 
 
-import pyes
+from pyes import ES
 
 
 __author__ = 'jorgealegre'
@@ -85,7 +85,7 @@ class DatabaseWrapper(NonrelDatabaseWrapper):
 
     def connect(self):
         if not self.connected or self.connection is None:
-            self.connection = pyes.ES(self.es_url, default_indices=[self.settings_dict['NAME']])
+            self.connection = ES(self.es_url, default_indices=[self.settings_dict['NAME']])
             connection_created.send(sender=self.__class__, connection=self)
             self.connected = True
 
