@@ -55,6 +55,8 @@ docs/build/
 docs/source/_static
 docs/source/_templates
 docs/source/conf.py
+make.bat
+Malefile
 
 # PyBuilder
 target/
