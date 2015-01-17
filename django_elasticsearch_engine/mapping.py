@@ -53,6 +53,7 @@ class IntegerFieldMapping(FieldMapping):
         """
         return mappings.IntegerField(name=field.name,
                                      store=True)
+FieldMapping.register(IntegerFieldMapping)
 
 
 class PositiveSmallIntegerFieldMapping(FieldMapping):
@@ -60,6 +61,7 @@ class PositiveSmallIntegerFieldMapping(FieldMapping):
     @classmethod
     def get(cls, field):
         pass
+FieldMapping.register(PositiveSmallIntegerFieldMapping)
 
 
 class SmallIntegerFieldMapping(FieldMapping):
@@ -67,6 +69,7 @@ class SmallIntegerFieldMapping(FieldMapping):
     @classmethod
     def get(cls, field):
         pass
+FieldMapping.register(SmallIntegerFieldMapping)
 
 
 class PositiveIntegerFieldMapping(FieldMapping):
@@ -74,6 +77,7 @@ class PositiveIntegerFieldMapping(FieldMapping):
     @classmethod
     def get(cls, field):
         pass
+FieldMapping.register(PositiveIntegerFieldMapping)
 
 
 class PositionFieldMapping(FieldMapping):
@@ -81,6 +85,7 @@ class PositionFieldMapping(FieldMapping):
     @classmethod
     def get(cls, field):
         pass
+FieldMapping.register(PositionFieldMapping)
 
 
 class FloatFieldMapping(FieldMapping):
@@ -88,6 +93,7 @@ class FloatFieldMapping(FieldMapping):
     @classmethod
     def get(cls, field):
         pass
+FieldMapping.register(FloatFieldMapping)
 
 
 class DecimalFieldMapping(FieldMapping):
@@ -95,6 +101,7 @@ class DecimalFieldMapping(FieldMapping):
     @classmethod
     def get(cls, field):
         pass
+FieldMapping.register(DecimalFieldMapping)
 
 
 class BooleanFieldMapping(FieldMapping):
@@ -102,6 +109,7 @@ class BooleanFieldMapping(FieldMapping):
     @classmethod
     def get(cls, field):
         pass
+FieldMapping.register(BooleanFieldMapping)
 
 
 class NullBooleanFieldMapping(FieldMapping):
@@ -109,3 +117,4 @@ class NullBooleanFieldMapping(FieldMapping):
     @classmethod
     def get(cls, field):
         pass
+FieldMapping.register(NullBooleanFieldMapping)
