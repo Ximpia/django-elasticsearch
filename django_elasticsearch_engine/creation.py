@@ -76,7 +76,7 @@ class DatabaseCreation(NonrelDatabaseCreation):
         self.connection.indices.create_index(test_database_name)
         self.connection.cluster.cluster_health(wait_for_status='green')
 
-        call_command('syncdb',
+        call_command('migrate',
                      verbosity=max(verbosity - 1, 0),
                      interactive=False,
                      database=self.connection.alias,
