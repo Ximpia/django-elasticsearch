@@ -109,3 +109,17 @@ class NullBooleanFieldMapping(FieldMapping):
     @classmethod
     def get(cls, field):
         pass
+
+
+class DateTimeFieldMapping(FieldMapping):
+
+    @classmethod
+    def get(cls, field):
+        pass
+
+
+class DateFieldMapping(FieldMapping):
+
+    @classmethod
+    def get(cls, field):
+        pass
