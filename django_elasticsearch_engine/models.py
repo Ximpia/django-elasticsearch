@@ -18,6 +18,8 @@ class BaseModel(models.Model):
     """
 
     ES index name:
+    $appname-$modelname-$modelindex-$datecreated
+    alias:
     $appname-$modelname-$modelindex
 
     Some cases we would want model forced into a model index, disallow from db default index
@@ -41,8 +43,8 @@ class BaseModel(models.Model):
             {
                 'by_user': {
                     'routing_field': 'user.id',
-                    'number_replicas': 1,
-                    'number_shards': 5,
+                    'number_of_replicas': 1,
+                    'number_of_shards': 5,
                 },
             }
         ]
@@ -62,8 +64,8 @@ class ExampleModel(BaseModel):
             {
                 'by_other_field': {
                     'routing': 'user.id',   # routing when index and query
-                    'number_replicas': 1,
-                    'number_shards': 5,
+                    'number_of_replicas': 1,
+                    'number_of_shards': 5,
                     'date_chunks': DATE_CHUNKS_PER_DAY,  # When have indexes by day or month
                     'boost_function': 'main_boost',   # Function to apply boost for document
                     'boost': {  # boost is collection of boost by score defined here
