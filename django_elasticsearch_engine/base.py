@@ -102,15 +102,6 @@ class DatabaseWrapper(NonrelDatabaseWrapper):
             self.connected = False
         self.connect()
 
-    def close(self):
-        pass
-
-    def _commit(self):
-        pass
-
-    def _rollback(self):
-        pass
-
     def schema_editor(self, *args, **kwargs):
         """
         Returns a new instance of this backend's SchemaEditor (Django>=1.7)
