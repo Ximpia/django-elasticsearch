@@ -24,7 +24,7 @@ class DatabaseFeatures(NonrelDatabaseFeatures):
 
 class DatabaseOperations(NonrelDatabaseOperations):
 
-    # compiler_module = __name__.rsplit('.', 1)[0] + '.compiler'
+    compiler_module = 'django_elasticsearch_engine.compiler'
 
     def sql_flush(self, style, tables, sequences, allow_cascade=False):
         for table in tables:
