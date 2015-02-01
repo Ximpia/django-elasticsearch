@@ -593,22 +593,32 @@ class SQLInsertCompiler(SQLCompiler):
                     }) + '\n' + json.dumps(field_values) + '\n')
             else:
                 for index_data in filter(lambda x: x[x.keys()[0]]['is_default'] is True, self.opts.indices):
-                    self.connection.bulker.add(json.dumps({
+                    index_conf = {
                         u'create': {
                             u'_index': index_data.keys()[0],
                             u'_type': self.opts.db_table,
                             u'_id': self._get_pk(field_values),
                         }
-                    }) + '\n' + json.dumps(field_values) + '\n')
+                    }
+                    if 'routing' in index_data:
+                        index_conf.update({
+                            u'routing': index_data['routing']
+                        })
+                    self.connection.bulker.add(json.dumps(index_conf) + '\n' + json.dumps(field_values) + '\n')
             for index_data in filter(lambda x: 'is_default' not in x[x.keys()[0]] or
                                      x[x.keys()[0]]['is_default'] is False, self.opts.indices):
-                self.connection.bulker.add(json.dumps({
+                index_conf = {
                     u'index': {
                         u'_index': index_data.keys()[0],
                         u'_type': self.opts.db_table,
                         u'_id': self._get_pk(field_values),
                     }
-                }) + '\n' + json.dumps(field_values) + '\n')
+                }
+                if 'routing' in index_data:
+                    index_conf.update({
+                        u'routing': index_data['routing']
+                    })
+                self.connection.bulker.add(json.dumps(index_conf) + '\n' + json.dumps(field_values) + '\n')
         res = self.connection.bulker.flush_bulk(force=True)
         # Pass the key value through normal database de-conversion.
         if return_id is False:
