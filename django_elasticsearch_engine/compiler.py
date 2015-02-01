@@ -511,6 +511,10 @@ class SQLCompiler(NonrelCompiler):
 
 class SQLInsertCompiler(SQLCompiler):
 
+    def __init__(self, *args, **kwargs):
+        super(SQLInsertCompiler, self).__init__(*args, **kwargs)
+        self.opts = self.query.get_meta()
+
     def _get_pk(self, data):
         """
         Get primary key
@@ -520,7 +524,7 @@ class SQLInsertCompiler(SQLCompiler):
         :param data:
         :return:
         """
-        pk_column = self.query.get_meta().pk.column
+        pk_column = self.opts.pk.column
         pk = None
         if pk_column in data:
             pk = data[pk_column]
@@ -561,9 +565,7 @@ class SQLInsertCompiler(SQLCompiler):
         :return: primary key saved in case we have return_id True.
         """
         assert not (return_id and len(self.query.objs) != 1)
-        opts = self.query.get_meta()
-        # to_insert = []
-        pk_field = opts.pk
+        pk_field = self.opts.pk
         for obj in self.query.objs:
             field_values = {}
             for field in self.query.fields:
@@ -580,13 +582,14 @@ class SQLInsertCompiler(SQLCompiler):
                 value = self.ops.value_for_db(value, field)
                 field_values[field.column] = value
             # TODO: Get indices from default indices and table indices
+            # TODO: Use create for default indexes (models) and index for table indexes
             indices = []
             for index in indices:
                 self.connection.bulker.add(json.dumps({
                     u'create': {
                         u'_index': index,
-                        u'_type': opts.db_table,
-                        u'_id': None,
+                        u'_type': self.opts.db_table,
+                        u'_id': self._get_pk(field_values),
                     }
                 }) + '\n' + json.dumps(field_values) + '\n')
         res = self.connection.bulker.flush_bulk(force=True)
