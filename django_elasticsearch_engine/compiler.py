@@ -1,4 +1,5 @@
 import logging
+import json
 
 from django.db.models.sql.compiler import SQLCompiler as BaseSQLCompiler
 from django.db.utils import DatabaseError
@@ -513,6 +514,9 @@ class SQLInsertCompiler(SQLCompiler):
     def _get_pk(self, data):
         """
         Get primary key
+
+        How is possible we have pk in doc???
+
         :param data:
         :return:
         """
@@ -525,64 +529,72 @@ class SQLInsertCompiler(SQLCompiler):
     def execute_sql(self, return_id=False):
         """
         Execute insert statement
+
+        Insert data into ElasticSearch using bulk inserts.
+
+        **Relationships**
+
+        1. Without relationships: We save data using index method in this table
+        2. Relationships
+            2.1: ForeignKey:    1. We save data and target relationship insert collection for this data.
+                                2. We fetch all the FKs in a single data query command to get target data to
+                                insert into model data. We use default index for data connection.
+            2.2: GenericRelationship: Similar to foreign key???
+        3. ManyToMany
+            3.1
+            We get collection of all items to save at this model
+            3.2
+            We insert our item into target collection
+
+        **Indexes**
+        1. We get indexes for model: default index plus all indexes for model with routing and sorting
+        2. We push bulk saving to all indexes active.
+
+        **Cases**
+
+        1. No model indexes, no routing
+        2. No model indexes, routing
+        3. Model indexes with routing
+        4. Model indexes with routing and ordering
+
         :param bool return_id:
-        :return:
+        :return: primary key saved in case we have return_id True.
         """
-        to_insert = []
-        pk_field = self.query.get_meta().pk
+        assert not (return_id and len(self.query.objs) != 1)
+        opts = self.query.get_meta()
+        # to_insert = []
+        pk_field = opts.pk
         for obj in self.query.objs:
             field_values = {}
             for field in self.query.fields:
+                # single relationships would return id in get_db_prep_save method
+                #  many relationships would return list of ids
                 value = field.get_db_prep_save(
                     getattr(obj, field.attname) if self.query.raw else field.pre_save(obj, obj._state.adding),
                     connection=self.connection
                 )
                 if value is None and not field.null and not field.primary_key:
-                    raise IntegrityError("You can't set %s (a non-nullable "
-                                         "field) to None!" % field.name)
-
+                    raise IntegrityError(u"You can't set {} (a non-nullable field) to None!".format(field.name))
                 # Prepare value for database, note that query.values have
                 # already passed through get_db_prep_save.
                 value = self.ops.value_for_db(value, field)
-
                 field_values[field.column] = value
-            to_insert.append(field_values)
-
-        key = self.insert(to_insert, return_id=return_id)
-
-        # Pass the key value through normal database deconversion.
+            # TODO: Get indices from default indices and table indices
+            indices = []
+            for index in indices:
+                self.connection.bulker.add(json.dumps({
+                    u'create': {
+                        u'_index': index,
+                        u'_type': opts.db_table,
+                        u'_id': None,
+                    }
+                }) + '\n' + json.dumps(field_values) + '\n')
+        res = self.connection.bulker.flush_bulk(force=True)
+        # Pass the key value through normal database de-conversion.
+        if return_id is False:
+            return
+        key = res['items']['create']['_id']
         return self.ops.convert_values(self.ops.value_from_db(key, pk_field), pk_field)
-
-    def insert(self, values, return_id=True):
-        """
-        Creates a new entity to represent a model.
-
-        Note that the returned key will go through the same database
-        deconversions that every value coming from the database does
-        (`convert_values` and `value_from_db`).
-
-        :param list values:     The model object as a list of {field: value, field2: value}
-                                each value is already prepared for the database
-        :param bool return_id:  Whether to return the id or key of the newly
-                                created entity
-
-
-        ------
-
-        Insert data into ElasticSearch
-
-        1. Without relationships: We save data using index method in this table
-        2. Relationships
-            2.1:
-
-        :return: The id of inserted data
-        :rtype str
-        """
-        pk = self._get_pk(values)
-        db_table = self.query.get_meta().db_table
-        # Make call to ElasticSearch index method
-        res = {}
-        return res['_id']
 
 
 class SQLUpdateCompiler(SQLCompiler):
