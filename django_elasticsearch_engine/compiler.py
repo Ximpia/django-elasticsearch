@@ -581,13 +581,30 @@ class SQLInsertCompiler(SQLCompiler):
                 # already passed through get_db_prep_save.
                 value = self.ops.value_for_db(value, field)
                 field_values[field.column] = value
-            # TODO: Get indices from default indices and table indices
-            # TODO: Use create for default indexes (models) and index for table indexes
-            indices = []
-            for index in indices:
+            if hasattr(self.opts, 'disable_default_index') and self.opts.disable_default_index is False:
+                default_indices = self.connection.default_indices
+                for index in default_indices:
+                    self.connection.bulker.add(json.dumps({
+                        u'create': {
+                            u'_index': index,
+                            u'_type': self.opts.db_table,
+                            u'_id': self._get_pk(field_values),
+                        }
+                    }) + '\n' + json.dumps(field_values) + '\n')
+            else:
+                for index_data in filter(lambda x: x[x.keys()[0]]['is_default'] is True, self.opts.indices):
+                    self.connection.bulker.add(json.dumps({
+                        u'create': {
+                            u'_index': index_data.keys()[0],
+                            u'_type': self.opts.db_table,
+                            u'_id': self._get_pk(field_values),
+                        }
+                    }) + '\n' + json.dumps(field_values) + '\n')
+            for index_data in filter(lambda x: 'is_default' not in x[x.keys()[0]] or
+                                     x[x.keys()[0]]['is_default'] is False, self.opts.indices):
                 self.connection.bulker.add(json.dumps({
-                    u'create': {
-                        u'_index': index,
+                    u'index': {
+                        u'_index': index_data.keys()[0],
                         u'_type': self.opts.db_table,
                         u'_id': self._get_pk(field_values),
                     }

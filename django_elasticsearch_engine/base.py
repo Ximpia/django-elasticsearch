@@ -85,7 +85,9 @@ class DatabaseWrapper(NonrelDatabaseWrapper):
 
     def connect(self):
         if not self.connected or self.connection is None:
-            self.connection = ES(self.es_url, default_indices=[self.settings_dict['NAME']])
+            self.connection = ES(self.es_url,
+                                 default_indices=[self.settings_dict['NAME']],
+                                 bulk_size=1000)
             connection_created.send(sender=self.__class__, connection=self)
             self.connected = True
 

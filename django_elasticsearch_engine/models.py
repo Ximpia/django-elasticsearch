@@ -70,7 +70,8 @@ class ExampleModel(BaseModel):
                     'boost_function': 'main_boost',   # Function to apply boost for document
                     'boost': {  # boost is collection of boost by score defined here
                         'field': 2.0,
-                    }
+                    },
+                    'is_default': True,
                 },
             }
         ]
