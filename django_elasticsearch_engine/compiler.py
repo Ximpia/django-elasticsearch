@@ -602,7 +602,7 @@ class SQLInsertCompiler(SQLCompiler):
                     }
                     if 'routing' in index_data:
                         index_conf.update({
-                            u'routing': index_data['routing']
+                            u'_routing': index_data['routing']
                         })
                     self.connection.bulker.add(json.dumps(index_conf) + '\n' + json.dumps(field_values) + '\n')
             for index_data in filter(lambda x: 'is_default' not in x[x.keys()[0]] or
@@ -616,7 +616,7 @@ class SQLInsertCompiler(SQLCompiler):
                 }
                 if 'routing' in index_data:
                     index_conf.update({
-                        u'routing': index_data['routing']
+                        u'_routing': index_data['routing']
                     })
                 self.connection.bulker.add(json.dumps(index_conf) + '\n' + json.dumps(field_values) + '\n')
         res = self.connection.bulker.flush_bulk(force=True)
