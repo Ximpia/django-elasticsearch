@@ -47,32 +47,3 @@ class BaseModel(models.Model):
                 },
             }
         ]
-
-
-"""class ExampleModel(BaseModel):
-
-    @classmethod
-    def main_boost(cls, obj):
-        return obj.number_likes*2.5
-
-    def __unicode__(self):
-        return ''
-
-    class Meta:
-        indices = [
-            {
-                'by_other_field': {
-                    'routing': 'user.id',   # routing when index and query
-                    'number_of_replicas': 1,
-                    'number_of_shards': 5,
-                    'date_chunks': DATE_CHUNKS_PER_DAY,  # When have indexes by day or month
-                    'boost_function': 'main_boost',   # Function to apply boost for document
-                    'boost': {  # boost is collection of boost by score defined here
-                        'field': 2.0,
-                    },
-                    'is_default': True,
-                },
-            }
-        ]
-        disable_default_index = True    # When save, we don't write to project default index, useful for log
-        type index"""
