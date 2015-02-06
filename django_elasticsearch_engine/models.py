@@ -35,7 +35,6 @@ class BaseModel(models.Model):
     updated_on = models.DateTimeField(auto_now=True)
     created_by = models.ForeignKey(User, null=True, blank=True)
     updated_by = models.ForeignKey(User, null=True, blank=True)
-    user = models.ForeignKey(User, null=True, blank=True)
 
     class Meta:
         abstract = True
@@ -50,7 +49,7 @@ class BaseModel(models.Model):
         ]
 
 
-class ExampleModel(BaseModel):
+"""class ExampleModel(BaseModel):
 
     @classmethod
     def main_boost(cls, obj):
@@ -75,4 +74,5 @@ class ExampleModel(BaseModel):
                 },
             }
         ]
-        disable_default_index = True    # When save, we don't write to project default index, useful for log type index
+        disable_default_index = True    # When save, we don't write to project default index, useful for log
+        type index"""
