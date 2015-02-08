@@ -1,10 +1,22 @@
+# python
+import logging
+
+# pyes
 from pyes import mappings
 from abc import ABCMeta, abstractmethod
 import sys
 from . import DjangoElasticEngineException
 from django.utils.translation import ugettext_lazy as _
 
+# django
+
+# djes
+from . import ENGINE
+
 __author__ = 'jorgealegre'
+
+
+logger = logging.getLogger(__name__)
 
 
 def model_to_mapping(model, **kwargs):
@@ -14,12 +26,18 @@ def model_to_mapping(model, **kwargs):
     :return:
     """
     meta = model._meta
-    mapping = mappings.ObjectField()
+    logger.debug(u'meta: {} fields: {}'.format(meta, meta.fields + meta.many_to_many))
+    # mapping = mappings.ObjectField()
+    mapping = mappings.DocumentObjectField(
+        connection=None,
+        index_name='',
+    )
     for field in meta.fields + meta.many_to_many:
         field_type = type(field).__name__
-        if hasattr(getattr(sys.modules['__main__'], '{}Mapping'.format(field_type))):
+        if hasattr(sys.modules[ENGINE + '.mapping'], '{}Mapping'.format(field_type)):
             # django model field type
-            field_mapping = getattr(sys.modules['__main__'], '{}Mapping'.format(field_type)).get(field, **kwargs)
+            field_mapping = getattr(sys.modules[ENGINE + '.mapping'], '{}Mapping'
+                                    .format(field_type)).get(field, **kwargs)
             if field_mapping:
                 mapping.add_property(field_mapping)
         elif hasattr(mappings, field_type):
@@ -44,6 +62,19 @@ class FieldMapping(object):
         :rtype mappings.IntegerField
         """
         pass
+
+
+class AutoFieldMapping(FieldMapping):
+
+    @classmethod
+    def get(cls, field, **kwargs):
+        """
+        Mapping for AutoField
+        :param field:
+        :param kwargs:
+        :return:
+        """
+        return mappings.StringField(name=field.name, store=True)
 
 
 class IntegerFieldMapping(FieldMapping):
@@ -122,12 +153,19 @@ class CharFieldMapping(FieldMapping):
     @classmethod
     def get(cls, field, **kwargs):
         """
+        Mapping for CharField
 
         :param field:
         :return:
         """
-        return mappings.StringField(name=field.name,
-                                    **kwargs)
+        return mappings.MultiField(name=field.name,
+                                   fields={field.name:mappings.StringField(name=field.name,
+                                                                           index="not_analyzed",
+                                                                           store=True),
+                                           "tk": mappings.StringField(name="tk", store=True,
+                                                                      index="analyzed",
+                                                                      term_vector="with_positions_offsets")}
+                                   )
 
 
 class TextFieldMapping(FieldMapping):

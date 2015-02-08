@@ -1,9 +1,20 @@
+# python
+import logging
+
+# django
 from djangotoolbox.db.base import NonrelDatabaseCreation
+
+# pyes
 from pyes.exceptions import NotFoundException
+
+# djes
 from mapping import model_to_mapping
+
 TEST_DATABASE_PREFIX = 'test_'
 
 __author__ = 'jorgealegre'
+
+logger = logging.getLogger(__name__)
 
 
 class DatabaseCreation(NonrelDatabaseCreation):
@@ -49,6 +60,7 @@ class DatabaseCreation(NonrelDatabaseCreation):
         return []
 
     def sql_indexes_for_model(self, model, style):
+        print 'sql_indexes_for_model....'
         return []
 
     def sql_create_model(self, model, style, known_models=set()):
@@ -60,6 +72,8 @@ class DatabaseCreation(NonrelDatabaseCreation):
         :param known_models
         :rtype list, dict
         """
+        logger.debug(u'sql_create_model....')
+        logger.debug(u'index: {}'.format(model._meta.db_table))
         self.connection.put_mapping(model._meta.db_table, model_to_mapping(model).as_dict())
         return [], {}
 
