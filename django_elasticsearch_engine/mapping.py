@@ -19,7 +19,7 @@ __author__ = 'jorgealegre'
 logger = logging.getLogger(__name__)
 
 
-def model_to_mapping(model, **kwargs):
+def model_to_mapping(model, connection, index_name, **kwargs):
     """
     This receives a model and generates the mapping
 
@@ -29,8 +29,9 @@ def model_to_mapping(model, **kwargs):
     logger.debug(u'meta: {} fields: {}'.format(meta, meta.fields + meta.many_to_many))
     # mapping = mappings.ObjectField()
     mapping = mappings.DocumentObjectField(
-        connection=None,
-        index_name='',
+        name=model._meta.db_table,
+        connection=connection,
+        index_name=index_name,
     )
     for field in meta.fields + meta.many_to_many:
         field_type = type(field).__name__

@@ -11,10 +11,12 @@ from django.utils.datastructures import SortedDict
 __author__ = 'jorgealegre'
 
 
-ENGINE = 'django_elasticsearch_engine'
-
 options.DEFAULT_NAMES = options.DEFAULT_NAMES + ('indices',
                                                  'disable_default_index')
+
+ENGINE = 'django_elasticsearch_engine'
+NUMBER_OF_REPLICAS = 1
+NUMBER_OF_SHARDS = 5
 
 
 def get_installed_apps():
