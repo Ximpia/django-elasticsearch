@@ -12,6 +12,7 @@ from django.utils.translation import ugettext_lazy as _
 
 # djes
 from . import ENGINE
+import fields
 
 __author__ = 'jorgealegre'
 
@@ -27,8 +28,7 @@ def model_to_mapping(model, connection, index_name, **kwargs):
     """
     meta = model._meta
     logger.debug(u'meta: {} fields: {}'.format(meta, meta.fields + meta.many_to_many))
-    # mapping = mappings.ObjectField()
-    mapping = mappings.DocumentObjectField(
+    mapping = fields.DocumentObjectField(
         name=model._meta.db_table,
         connection=connection,
         index_name=index_name,
@@ -75,7 +75,9 @@ class AutoFieldMapping(FieldMapping):
         :param kwargs:
         :return:
         """
-        return mappings.StringField(name=field.name, store=True)
+        return fields.StringField(name=field.name,
+                                  store=True,
+                                  index='not_analyzed')
 
 
 class IntegerFieldMapping(FieldMapping):
@@ -160,12 +162,11 @@ class CharFieldMapping(FieldMapping):
         :return:
         """
         return mappings.MultiField(name=field.name,
-                                   fields={field.name:mappings.StringField(name=field.name,
-                                                                           index="not_analyzed",
-                                                                           store=True),
-                                           "tk": mappings.StringField(name="tk", store=True,
-                                                                      index="analyzed",
-                                                                      term_vector="with_positions_offsets")}
+                                   fields={field.name: fields.StringField(name=field.name,
+                                                                          index="analyzed",
+                                                                          term_vector="with_positions_offsets"),
+                                           "raw": fields.StringField(name="raw",
+                                                                     index="not_analyzed")}
                                    )
 
 
@@ -178,9 +179,9 @@ class TextFieldMapping(FieldMapping):
         :param field:
         :return:
         """
-        return mappings.StringField(name=field.name,
-                                    analyzer=analyzer,
-                                    **kwargs)
+        return fields.StringField(name=field.name,
+                                  analyzer=analyzer,
+                                  **kwargs)
 
 
 class DateTimeFieldMapping(FieldMapping):
