@@ -69,10 +69,4 @@ class Command(BaseCommand):
                         mapping = model_to_mapping(model, es_connection, index_name)
                         logger.debug(u'mapping: {}'.format(pprint.PrettyPrinter(indent=4).pformat(mapping)))
                         logger.debug(u'mapping: {}'.format(pprint.PrettyPrinter(indent=4).pformat(mapping.as_dict())))
-                        logger.debug(u'doc_type: {}'.format(model._meta.db_table))
-                        result = es_connection.indices.put_mapping(
-                            model._meta.db_table,
-                            mapping,
-                            indices=[index_name]
-                        )
-                        logger.info(u'result: {}'.format(pprint.PrettyPrinter(indent=4).pformat(result)))
+                        mapping.save()

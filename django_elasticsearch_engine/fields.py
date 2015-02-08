@@ -1,4 +1,6 @@
 # python
+import logging
+import pprint
 
 # django
 
@@ -6,6 +8,8 @@
 from pyes import mappings
 
 __author__ = 'jorgealegre'
+
+logger = logging.getLogger(__name__)
 
 
 class StringField(mappings.StringField):
@@ -34,6 +38,14 @@ class ObjectField(mappings.ObjectField):
         del map_['type']
         return map_
 
+    def save(self):
+        if self.connection is None:
+            raise RuntimeError(u"No connection available")
+        result = self.connection.indices.put_mapping(doc_type=self.name,
+                                                     mapping=self.as_dict(),
+                                                     indices=self.index_name)
+        logger.info(u'result: {}'.format(pprint.PrettyPrinter(indent=4).pformat(result)))
+
 
 class DocumentObjectField(mappings.DocumentObjectField):
 
@@ -44,3 +56,11 @@ class DocumentObjectField(mappings.DocumentObjectField):
         map_ = super(DocumentObjectField, self).as_dict()
         del map_['type']
         return map_
+
+    def save(self):
+        if self.connection is None:
+            raise RuntimeError(u"No connection available")
+        result = self.connection.indices.put_mapping(doc_type=self.name,
+                                                     mapping=self.as_dict(),
+                                                     indices=self.index_name)
+        logger.info(u'result: {}'.format(pprint.PrettyPrinter(indent=4).pformat(result)))
