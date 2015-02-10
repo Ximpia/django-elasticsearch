@@ -1,3 +1,7 @@
+# python
+import logging
+
+# django
 from django.db import models
 from django.utils.translation import ugettext_lazy as _
 from django.contrib.auth.models import User
@@ -11,6 +15,15 @@ DATE_CHUNKS_CHOICE = (
     (DATE_CHUNKS_PER_DAY, _(u'Per Day')),
     (DATE_CHUNKS_PER_MONTH, _(u'Per Month')),
 )
+
+logger = logging.getLogger(__name__)
+
+
+def get_settings_by_meta(meta_index):
+    return {
+        'number_of_replicas': meta_index['number_of_replicas'],
+        'number_of_shards': meta_index['number_of_shards'],
+    }
 
 
 class BaseModel(models.Model):

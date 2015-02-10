@@ -67,6 +67,7 @@ class DatabaseIntrospection(NonrelDatabaseIntrospection):
         super(NonrelDatabaseIntrospection, self).__init__(*args, **kwargs)
         self._models = {}
         self._models_discovered = False
+        self._mappings = {}
 
     def _discover_models(self):
         """
@@ -106,6 +107,10 @@ class DatabaseIntrospection(NonrelDatabaseIntrospection):
             self._discover_models()
             self._models_discovered = True
         return self._models
+
+    @property
+    def mappings(self):
+        return self._mappings
 
     def django_table_names(self, only_existing=False):
         """

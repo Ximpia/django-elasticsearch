@@ -29,16 +29,18 @@ def model_to_mapping(model, connection, index_name, **kwargs):
     meta = model._meta
     logger.debug(u'meta: {} fields: {}'.format(meta, meta.fields + meta.many_to_many))
     mapping = fields.DocumentObjectField(
-        name=model._meta.db_table,
+        name=kwargs.get('name', model._meta.db_table),
         connection=connection,
         index_name=index_name,
     )
+    if '_routing' in kwargs:
+        mapping['_routing'] = kwargs['_routing']
     for field in meta.fields + meta.many_to_many:
         field_type = type(field).__name__
         if hasattr(sys.modules[ENGINE + '.mapping'], '{}Mapping'.format(field_type)):
             # django model field type
             field_mapping = getattr(sys.modules[ENGINE + '.mapping'], '{}Mapping'
-                                    .format(field_type)).get(field, **kwargs)
+                                    .format(field_type)).get(field)
             if field_mapping:
                 mapping.add_property(field_mapping)
         elif hasattr(mappings, field_type):
