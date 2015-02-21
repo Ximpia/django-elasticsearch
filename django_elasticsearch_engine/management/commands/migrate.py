@@ -47,6 +47,7 @@ class Command(BaseCommand):
             self.stdout.write(u'Removing index "{}"'.format(index_name))
             es_connection.indices.delete_index(index_name)
 
+
         # Call regular migrate if engine is different from ours
         if engine != ENGINE:
             return super(Command, self).handle(**options)
