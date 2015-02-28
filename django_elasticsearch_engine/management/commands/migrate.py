@@ -14,7 +14,9 @@ from pyes.exceptions import IndexAlreadyExistsException, IndexMissingException
 # django_elasticsearch_Engine
 from django_elasticsearch_engine.mapping import model_to_mapping
 from django_elasticsearch_engine.models import get_settings_by_meta
-from django_elasticsearch_engine import ENGINE, NUMBER_OF_REPLICAS, NUMBER_OF_SHARDS
+from django_elasticsearch_engine import ENGINE, NUMBER_OF_REPLICAS, NUMBER_OF_SHARDS, INTERNAL_INDEX
+from django_elasticsearch_engine.fields import DocumentObjectField, DateField, StringField, IntegerField, \
+    ObjectField
 
 __author__ = 'jorgealegre'
 
@@ -23,37 +25,91 @@ logger = logging.getLogger(__name__)
 
 class Command(BaseCommand):
 
-    def _create_index(self, es_connection, index_name, options):
-        es_connection.indices.create_index(index_name, settings={
-            'analysis': options.get('ANALYSIS', {}),
-            'number_of_replicas': options.get('NUMBER_OF_REPLICAS', NUMBER_OF_REPLICAS),
-            'number_of_shards': options.get('NUMBER_OF_SHARDS', NUMBER_OF_SHARDS),
+    def _build_django_engine_structure(self):
+        # crete .django_engine index
+        self._create_index(INTERNAL_INDEX, {
+            'number_of_replicas': 1,
+            'number_of_shards': 5,
         })
+        # mappings for content index
+        mapping_indices = DocumentObjectField(
+            name='indices',
+            connection=self.connection,
+            index_name=INTERNAL_INDEX,
+            properties={
+                'operation': StringField(index='not_analyzed'),
+                'index_name': StringField(index='not_analyzed'),
+                'options': ObjectField(),
+                'created_on': DateField(),
+                'updated_on': DateField(),
+            })
+        try:
+            result = self.connection.indices.put_mapping(doc_type='indices',
+                                                         mapping=mapping_indices.as_dict(),
+                                                         indices=INTERNAL_INDEX)
+            logger.info(u'{} result: {}'.format('.django_engine/indices',
+                                                pprint.PrettyPrinter(indent=4).pformat(result)))
+        except Exception:
+            # MergeMappingException
+            pass
+        # mappings for mapping_migration
+        mapping_migration = DocumentObjectField(
+            name='mapping_migration',
+            connection=self.connection,
+            index_name=INTERNAL_INDEX,
+            properties={
+                'operation': StringField(index='not_analyzed'),
+                'doc_type': StringField(index='not_analyzed'),
+                'mapping_old': StringField(index='not_analyzed'),
+                'mapping_new': StringField(index='not_analyzed'),
+                'created_on': DateField(),
+                'updated_on': DateField(),
+            })
+        try:
+            result = self.connection.indices.put_mapping(doc_type='mapping_migration',
+                                                         mapping=mapping_migration.as_dict(),
+                                                         indices=INTERNAL_INDEX)
+            logger.info(u'{} result: {}'.format('.django_engine/mapping_migration',
+                                                pprint.PrettyPrinter(indent=4).pformat(result)))
+        except Exception:
+            # MergeMappingException
+            pass
+
+    def _create_index(self, index_name, options):
+        """
+
+        :param index_name:
+        :param options:
+        :return:
+        """
+        es_connection = self.connection.connection
+        try:
+            es_connection.indices.create_index(index_name, settings={
+                'analysis': options.get('ANALYSIS', {}),
+                'number_of_replicas': options.get('NUMBER_OF_REPLICAS', NUMBER_OF_REPLICAS),
+                'number_of_shards': options.get('NUMBER_OF_SHARDS', NUMBER_OF_SHARDS),
+            })
+            # Write pyes action
+            self.stdout.write(u'index "{}" created'.format(index_name))
+        except IndexAlreadyExistsException:
+            pass
 
     def handle(self, *args, **options):
         engine = settings.DATABASES.get(DEFAULT_DB_ALIAS, {}).get('ENGINE', '')
         global_index_name = settings.DATABASES.get(DEFAULT_DB_ALIAS, {}).get('NAME', '')
         options = settings.DATABASES.get(DEFAULT_DB_ALIAS, {}).get('OPTIONS', {})
+        self.options = options
 
         connection = connections[DEFAULT_DB_ALIAS]
+        self.connection = connection
         es_connection = connection.connection
-
-        ans = raw_input(u'\n** WARNING **\nI will remove all indices. Do you want to continue? (y/n) <y> ')
-        ans = ans or 'y'
-        if ans.lower() == 'n':
-            sys.exit(1)
-
-        for index_name in es_connection.indices.get_indices():
-            self.stdout.write(u'Removing index "{}"'.format(index_name))
-            es_connection.indices.delete_index(index_name)
-
 
         # Call regular migrate if engine is different from ours
         if engine != ENGINE:
             return super(Command, self).handle(**options)
         else:
-            self._create_index(es_connection, global_index_name, options)
-            self.stdout.write(u'index "{}" created'.format(global_index_name))
+            self._build_django_engine_structure()
+            self._create_index(global_index_name, options)
             logger.debug(u'models: {}'.format(connection.introspection.models))
             for app_name, app_models in connection.introspection.models.iteritems():
                 for model in app_models:
@@ -61,7 +117,6 @@ class Command(BaseCommand):
                     mapping = model_to_mapping(model, es_connection, global_index_name)
                     logger.debug(u'mapping: {}'.format(pprint.PrettyPrinter(indent=4).pformat(mapping.as_dict())))
                     mapping.save()
-                    connection.introspection.mappings[u'{}.{}'.format(app_name, model.__name__)] = mapping
                     if not hasattr(model._meta, 'indices'):
                         continue
                     for model_index in model._meta.indices:

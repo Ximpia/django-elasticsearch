@@ -1,11 +1,19 @@
 # python
 import logging
 import pprint
+import json
+from datetime import datetime
 
 # django
 
 # pyes
 from pyes import mappings
+from pyes.query import QueryStringQuery, Search
+
+# django_elasticsearch_engine
+from django_elasticsearch_engine import INTERNAL_INDEX
+
+from django.db import models
 
 __author__ = 'jorgealegre'
 
@@ -92,14 +100,6 @@ class ObjectField(mappings.ObjectField):
         del map_['type']
         return map_
 
-    def save(self):
-        if self.connection is None:
-            raise RuntimeError(u"No connection available")
-        result = self.connection.indices.put_mapping(doc_type=self.name,
-                                                     mapping=self.as_dict(),
-                                                     indices=self.index_name)
-        logger.info(u'result: {}'.format(pprint.PrettyPrinter(indent=4).pformat(result)))
-
 
 class DocumentObjectField(mappings.DocumentObjectField):
 
@@ -114,7 +114,28 @@ class DocumentObjectField(mappings.DocumentObjectField):
     def save(self):
         if self.connection is None:
             raise RuntimeError(u"No connection available")
-        result = self.connection.indices.put_mapping(doc_type=self.name,
-                                                     mapping=self.as_dict(),
-                                                     indices=self.index_name)
-        logger.info(u'result: {}'.format(pprint.PrettyPrinter(indent=4).pformat(result)))
+        try:
+            mappings_old = self.connection.indices.get_mapping(doc_type=self.name,
+                                                               indices=self.index_name)
+            result = self.connection.indices.put_mapping(doc_type=self.name,
+                                                         mapping=self.as_dict(),
+                                                         indices=self.index_name)
+            logger.info(u'result: {}'.format(pprint.PrettyPrinter(indent=4).pformat(result)))
+            # update internal .django_engine index
+            self.connection.index({
+                'operation': 'put_mapping',
+                'doc_type': self.name,
+                'mapping_old': json.dumps(mappings_old.as_dict()),
+                'mapping_new':  json.dumps(result.as_dict()),
+                'created_on': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                'updated_on': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            }, INTERNAL_INDEX, 'mapping_migration')
+        except Exception:
+            # reindex
+            # MergeMappingException
+            # 1. create alt index
+            # 2. export/import data to new index
+            # 3. assign alias to new index
+            # 4. delete old index
+            # TODO: Implement model reindex
+            logger.info(u'Could not update mappings for doc_type:"{}"'.format(self.name))

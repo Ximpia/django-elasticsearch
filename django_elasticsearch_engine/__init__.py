@@ -17,6 +17,7 @@ options.DEFAULT_NAMES = options.DEFAULT_NAMES + ('indices',
 ENGINE = 'django_elasticsearch_engine'
 NUMBER_OF_REPLICAS = 1
 NUMBER_OF_SHARDS = 5
+INTERNAL_INDEX = '.django_engine'
 
 
 def get_installed_apps():
