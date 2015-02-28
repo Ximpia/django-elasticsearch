@@ -28,6 +28,60 @@ class StringField(mappings.StringField):
         return map_
 
 
+class DateField(mappings.DateField):
+
+    def __init__(self, *args, **kwargs):
+        super(DateField, self).__init__(*args, **kwargs)
+
+
+class BooleanField(mappings.BooleanField):
+
+    def __init__(self, *args, **kwargs):
+        super(BooleanField, self).__init__(*args, **kwargs)
+
+
+class DoubleField(mappings.DoubleField):
+
+    def __init__(self, *args, **kwargs):
+        super(DoubleField, self).__init__(*args, **kwargs)
+
+
+class FloatField(mappings.FloatField):
+
+    def __init__(self, *args, **kwargs):
+        super(FloatField, self).__init__(*args, **kwargs)
+
+
+class IntegerField(mappings.IntegerField):
+
+    def __init__(self, *args, **kwargs):
+        super(IntegerField, self).__init__(*args, **kwargs)
+
+
+class LongField(mappings.LongField):
+
+    def __init__(self, *args, **kwargs):
+        super(LongField, self).__init__(*args, **kwargs)
+
+
+class MultiField(mappings.MultiField):
+
+    def __init__(self, *args, **kwargs):
+        super(MultiField, self).__init__(*args, **kwargs)
+
+
+class NestedObject(mappings.NestedObject):
+
+    def __init__(self, *args, **kwargs):
+        super(NestedObject, self).__init__(*args, **kwargs)
+
+
+class ShortField(mappings.ShortField):
+
+    def __init__(self, *args, **kwargs):
+        super(ShortField, self).__init__(*args, **kwargs)
+
+
 class ObjectField(mappings.ObjectField):
 
     def __init__(self, *args, **kwargs):
