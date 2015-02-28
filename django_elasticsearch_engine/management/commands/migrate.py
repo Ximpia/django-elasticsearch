@@ -2,6 +2,7 @@
 import logging
 import pprint
 import sys
+import traceback
 
 # django
 from django.conf import settings
@@ -51,7 +52,7 @@ class Command(BaseCommand):
                                                 pprint.PrettyPrinter(indent=4).pformat(result)))
         except Exception:
             # MergeMappingException
-            pass
+            traceback.print_exc()
         # mappings for mapping_migration
         mapping_migration = DocumentObjectField(
             name='mapping_migration',
@@ -73,7 +74,7 @@ class Command(BaseCommand):
                                                 pprint.PrettyPrinter(indent=4).pformat(result)))
         except Exception:
             # MergeMappingException
-            pass
+            traceback.print_exc()
 
     def _create_index(self, index_name, options):
         """
