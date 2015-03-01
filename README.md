@@ -1,1 +1,1 @@
-# django-elasticsearch-engine
+# django-elasticsearch
