@@ -14,7 +14,7 @@ __author__ = 'jorgealegre'
 options.DEFAULT_NAMES = options.DEFAULT_NAMES + ('indices',
                                                  'disable_default_index')
 
-ENGINE = 'django_elasticsearch_engine'
+ENGINE = 'django_elasticsearch'
 NUMBER_OF_REPLICAS = 1
 NUMBER_OF_SHARDS = 5
 INTERNAL_INDEX = '.django_engine'

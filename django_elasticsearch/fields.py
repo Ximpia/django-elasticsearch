@@ -10,8 +10,8 @@ from datetime import datetime
 from pyes import mappings
 from pyes.query import QueryStringQuery, Search
 
-# django_elasticsearch_engine
-from django_elasticsearch_engine import INTERNAL_INDEX
+# django_elasticsearch
+from django_elasticsearch import INTERNAL_INDEX
 
 from django.db import models
 
