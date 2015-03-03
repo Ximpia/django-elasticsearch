@@ -101,7 +101,7 @@ class DatabaseOperations(NonrelDatabaseOperations):
         """
         Deletes index
 
-        :param index_name:
+        :param index_name: Index name
         :return:
         """
         es_connection = self.connection.connection
@@ -115,9 +115,14 @@ class DatabaseOperations(NonrelDatabaseOperations):
         }, INTERNAL_INDEX, 'indices')
         logger.info(u'index "{}" deleted'.format(index_name))
 
-    def rebuild_index(self):
+    def rebuild_index(self, index_name):
         """
         Rebuilds index in the background
+
+        1. Rebuild global index: Rebuilds whole database with all models
+        2. Model rebuild: Rebuilds only model main store data and associated indexes
+
+        :param index_name: Index name
 
         :return:
         """
@@ -129,8 +134,7 @@ class DatabaseOperations(NonrelDatabaseOperations):
         pass
 
     def build_django_engine_structure(self):
-        from django_elasticsearch.fields import DocumentObjectField, DateField, StringField, IntegerField, \
-            ObjectField
+        from django_elasticsearch.fields import DocumentObjectField, DateField, StringField, ObjectField
         # crete .django_engine index
         try:
             self.create_index(INTERNAL_INDEX, {
@@ -140,6 +144,7 @@ class DatabaseOperations(NonrelDatabaseOperations):
         except IndexAlreadyExistsException:
             pass
         # mappings for content index
+        rebuild_index = False
         mapping_indices = DocumentObjectField(
             name='indices',
             connection=self.connection,
@@ -161,6 +166,7 @@ class DatabaseOperations(NonrelDatabaseOperations):
         except Exception:
             # MergeMappingException
             traceback.print_exc()
+            rebuild_index = True
         # mappings for mapping_migration
         mapping_migration = DocumentObjectField(
             name='mapping_migration',
@@ -183,6 +189,9 @@ class DatabaseOperations(NonrelDatabaseOperations):
         except Exception:
             # MergeMappingException
             traceback.print_exc()
+            rebuild_index = True
+        if rebuild_index:
+            self.rebuild_index(INTERNAL_INDEX)
 
 
 class DatabaseClient(NonrelDatabaseClient):
