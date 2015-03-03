@@ -106,6 +106,14 @@ class DatabaseOperations(NonrelDatabaseOperations):
         """
         es_connection = self.connection.connection
         es_connection.indices.delete_index(index_name)
+        # save index creation data
+        es_connection.index({
+            'operation': 'delete_index',
+            'alias': index_name,
+            'created_on': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            'updated_on': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        }, INTERNAL_INDEX, 'indices')
+        logger.info(u'index "{}" deleted'.format(index_name))
 
     def rebuild_index(self):
         """
