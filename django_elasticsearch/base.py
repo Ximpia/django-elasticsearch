@@ -57,7 +57,7 @@ class DatabaseOperations(NonrelDatabaseOperations):
         """
         pass
 
-    def create_index(self, index_name, options, alias=None, mapping=None):
+    def create_index(self, index_name, options, has_alias=True):
         """
         Creates index with options as settings
 
@@ -70,18 +70,32 @@ class DatabaseOperations(NonrelDatabaseOperations):
         :raises IndexAlreadyExistsException when can't create index.
         """
         # "logstash-%{+YYYY.MM.dd}"
-        alias = index_name if alias is None else alias
-        index_name = u'{}-{}'.format(index_name, datetime.now().strftime("%Y.%m.%dT%H:%M:%S"))
+        alias = index_name if has_alias is True else None
+        if has_alias:
+            index_name = u'{}-{}'.format(index_name, datetime.now().strftime("%Y.%m.%dT%H:%M:%S"))
         es_connection = self.connection.connection
-        es_connection.indices.create_index(index_name, settings={
+        index_settings = {
             'analysis': options.get('ANALYSIS', {}),
             'number_of_replicas': options.get('NUMBER_OF_REPLICAS', NUMBER_OF_REPLICAS),
             'number_of_shards': options.get('NUMBER_OF_SHARDS', NUMBER_OF_SHARDS),
-        })
+        }
+        es_connection.indices.create_index(index_name, settings=index_settings)
         # alias
-        es_connection.indices.add_alias(alias, index_name)
-        # TODO: Implement .django_engine index create
-        logger.info(u'index "{}" created'.format(index_name))
+        if has_alias:
+            es_connection.indices.add_alias(alias, index_name)
+        # save index creation data
+        es_connection.index({
+            'operation': 'create_index',
+            'index_name': index_name,
+            'alias': alias,
+            'settings': index_settings,
+            'created_on': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            'updated_on': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        }, INTERNAL_INDEX, 'indices')
+        if has_alias:
+            logger.info(u'index "{}" aliased "{}" created'.format(index_name))
+        else:
+            logger.info(u'index "{}" created'.format(index_name))
 
     def delete_index(self, index_name):
         """
@@ -125,7 +139,8 @@ class DatabaseOperations(NonrelDatabaseOperations):
             properties={
                 'operation': StringField(index='not_analyzed'),
                 'index_name': StringField(index='not_analyzed'),
-                'options': ObjectField(),
+                'alias': StringField(index='not_analyzed'),
+                'settings': ObjectField(),
                 'created_on': DateField(),
                 'updated_on': DateField(),
             })
