@@ -4,11 +4,14 @@ import logging
 import traceback
 import pprint
 from datetime import datetime
+import json
 
 # django
 from django.db.backends import connection_created
 from django.db import connections, router, transaction, models as dj_models, DEFAULT_DB_ALIAS
 from django.utils.datastructures import SortedDict
+from django.conf import settings
+from django.utils.translation import ugettext as _
 
 
 # djangotoolbox
@@ -24,11 +27,14 @@ from djangotoolbox.db.base import (
 # pyes
 from pyes import ES
 from pyes.exceptions import IndexAlreadyExistsException, IndexMissingException
+from pyes.query import Search, QueryStringQuery
 
 # djes
 from creation import DatabaseCreation
 from schema import DatabaseSchemaEditor
 from . import ENGINE, NUMBER_OF_REPLICAS, NUMBER_OF_SHARDS, INTERNAL_INDEX
+from mapping import model_to_mapping
+import exceptions
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +50,8 @@ class DatabaseFeatures(NonrelDatabaseFeatures):
 class DatabaseOperations(NonrelDatabaseOperations):
 
     compiler_module = 'django_elasticsearch.compiler'
+    SCROLL_TIME = '10m'
+    ADD_BULK_SIZE = 1000
 
     def sql_flush(self, style, tables, sequences, allow_cascade=False):
         for table in tables:
@@ -57,7 +65,7 @@ class DatabaseOperations(NonrelDatabaseOperations):
         """
         pass
 
-    def create_index(self, index_name, options, has_alias=True):
+    def create_index(self, index_name, options, has_alias=True, model=None):
         """
         Creates index with options as settings
 
@@ -71,8 +79,7 @@ class DatabaseOperations(NonrelDatabaseOperations):
         """
         # "logstash-%{+YYYY.MM.dd}"
         alias = index_name if has_alias is True else None
-        if has_alias:
-            index_name = u'{}-{}'.format(index_name, datetime.now().strftime("%Y.%m.%dT%H:%M:%S"))
+        index_name = u'{}-{}'.format(index_name, datetime.now().strftime("%Y.%m.%dT%H:%M:%S"))
         es_connection = self.connection.connection
         index_settings = {
             'analysis': options.get('ANALYSIS', {}),
@@ -96,6 +103,7 @@ class DatabaseOperations(NonrelDatabaseOperations):
             logger.info(u'index "{}" aliased "{}" created'.format(index_name))
         else:
             logger.info(u'index "{}" created'.format(index_name))
+        return index_name, alias
 
     def delete_index(self, index_name):
         """
@@ -115,7 +123,7 @@ class DatabaseOperations(NonrelDatabaseOperations):
         }, INTERNAL_INDEX, 'indices')
         logger.info(u'index "{}" deleted'.format(index_name))
 
-    def rebuild_index(self, index_name):
+    def rebuild_index(self, alias):
         """
         Rebuilds index in the background
 
@@ -126,12 +134,62 @@ class DatabaseOperations(NonrelDatabaseOperations):
 
         :return:
         """
+        es_connection = self.connection.connection
+        options = settings.DATABASES.get(DEFAULT_DB_ALIAS, {}).get('OPTIONS', {})
         # 1. create alt index
-        # 2. create mappings for alt index: mapping.save()
+        index_data = self.create_index(alias, options, has_alias=False)
+        index_name_physical = index_data[0]
+        # 2. Inspect all models: create mappings for alt index: mapping.save()
+        if alias in settings.DATABASES:
+            # global index
+            for app_name, app_models in self.connection.introspection.models.iteritems():
+                for model in app_models:
+                    mapping = model_to_mapping(model, es_connection, index_name_physical)
+                    mapping.save()
+        else:
+            # get model by index
+            query = '(alias:({alias}))'.format(alias)
+            results = es_connection.search(Search(QueryStringQuery(query)),
+                                           indices=INTERNAL_INDEX,
+                                           doc_types='model')
+            if results and len(results) == 1:
+                model = results[0].model
+                mapping = model_to_mapping(model, es_connection, index_name_physical)
+                mapping.save()
+            else:
+                # raise exception RebuildIndexException
+                raise exceptions.RebuildIndexException(_(u'No model data found in {}'.format(INTERNAL_INDEX)))
         # 2. export/import data to new index
+        # bulk operations
+        results = es_connection.search(Search(QueryStringQuery('*:*')),
+                                       indices=alias,
+                                       scroll=self.SCROLL_TIME)
+        scroll_id = results.scroller_id
+        es_connection.bulk_size = self.ADD_BULK_SIZE
+        bulk = es_connection.create_bulker()
+        while results:
+            for result in results:
+                # add to bulk for index
+                # content = json.dumps(result.get_meta()) + '\n'
+                meta = result.get_meta()
+                content = '{ "index" : { "_index" : "{index_name}", "_type" : "{doc_type}", ' \
+                          '"_id" : "{id}" } }\n'\
+                    .format(index_name_physical,
+                            meta['type'],
+                            meta['id'])
+                content += json.dumps(result) + '\n'
+                bulk.add(content)
+            # make bulk add to new index "index_name_physical"
+            results = es_connection.search_scroll(scroll_id, scroll=self.SCROLL_TIME)
+        bulk.flush_bulk()
         # 3. assign alias to new index
+        indices = es_connection.indices.get_alias(alias)
+        es_connection.indices.change_aliases([
+            ('remove', indices[0], alias),
+            ('add', index_name_physical, alias),
+        ])
         # 4. delete old index
-        pass
+        self.delete_index(index_name_physical)
 
     def build_django_engine_structure(self):
         from django_elasticsearch.fields import DocumentObjectField, DateField, StringField, ObjectField
@@ -153,6 +211,7 @@ class DatabaseOperations(NonrelDatabaseOperations):
                 'operation': StringField(index='not_analyzed'),
                 'index_name': StringField(index='not_analyzed'),
                 'alias': StringField(index='not_analyzed'),
+                'model': StringField(index='not_analyzed'),
                 'settings': ObjectField(),
                 'created_on': DateField(),
                 'updated_on': DateField(),
@@ -185,6 +244,30 @@ class DatabaseOperations(NonrelDatabaseOperations):
                                                          mapping=mapping_migration.as_dict(),
                                                          indices=INTERNAL_INDEX)
             logger.info(u'{} result: {}'.format('.django_engine/mapping_migration',
+                                                pprint.PrettyPrinter(indent=4).pformat(result)))
+        except Exception:
+            # MergeMappingException
+            traceback.print_exc()
+            rebuild_index = True
+        # model
+        mapping_model = DocumentObjectField(
+            name='model',
+            connection=self.connection,
+            index_name=INTERNAL_INDEX,
+            properties={
+                'index_name': StringField(index='not_analyzed'),
+                'alias': StringField(index='not_analyzed'),
+                'model': StringField(index='not_analyzed'),
+                'mapping': StringField(index='not_analyzed'),
+                'settings': ObjectField(),
+                'created_on': DateField(),
+                'updated_on': DateField(),
+            })
+        try:
+            result = self.connection.indices.put_mapping(doc_type='model',
+                                                         mapping=mapping_model.as_dict(),
+                                                         indices=INTERNAL_INDEX)
+            logger.info(u'{} result: {}'.format('.django_engine/model',
                                                 pprint.PrettyPrinter(indent=4).pformat(result)))
         except Exception:
             # MergeMappingException
