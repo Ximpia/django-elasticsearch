@@ -131,7 +131,9 @@ class ObjectField(mappings.ObjectField):
                     logger.debug(u'Will get field from dictionary')
                     map_[item] = get_field(item, properties[item])
                 else:
-                    map_[item] = properties[item]
+                    instance = properties[item]
+                    instance.name = item
+                    map_[item] = instance
             self.properties = OrderedDict(sorted([(name, data) for name, data in map_.items()]))
         else:
             self.properties = {}

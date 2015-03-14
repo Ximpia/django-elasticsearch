@@ -213,41 +213,27 @@ class DatabaseOperations(NonrelDatabaseOperations):
             connection=self.connection,
             index_name=INTERNAL_INDEX,
             properties={
-                'operation': StringField(
-                    name='operation',
-                    index='not_analyzed'),
-                'index_name': StringField(
-                    name='index_name',
-                    index='not_analyzed'),
-                'alias': StringField(
-                    name='alias',
-                    index='not_analyzed'),
-                'model': StringField(
-                    name='model',
-                    index='not_analyzed'),
-                'settings': ObjectField(name='settings'),
-                'created_on': DateField(name='created_on'),
-                'updated_on': DateField(name='updated_on'),
+                'operation': StringField(index='not_analyzed'),
+                'index_name': StringField(index='not_analyzed'),
+                'alias': StringField(index='not_analyzed'),
+                'model': StringField(index='not_analyzed'),
+                'settings': ObjectField(),
+                'created_on': DateField(),
+                'updated_on': DateField(),
             })
-
-        """mapping_indices = DocumentObjectField(
-            name='indices',
-            connection=self.connection,
-            index_name=INTERNAL_INDEX)
-        mapping_indices.add_property(StringField(name='operation', index='not_analyzed'))"""
 
         logger.info(u'build_django_engine_structure :: mapping: {}'.format(
             pprint.PrettyPrinter(indent=4).pformat(mapping_indices.as_dict())))
-        # try:
-        result = es_connection.indices.put_mapping(doc_type='indices',
-                                                   mapping=mapping_indices,
-                                                   indices=INTERNAL_INDEX)
-        logger.info(u'{} result: {}'.format('.django_engine/indices',
-                                            pprint.PrettyPrinter(indent=4).pformat(result)))
-        """except Exception:
+        try:
+            result = es_connection.indices.put_mapping(doc_type='indices',
+                                                       mapping=mapping_indices,
+                                                       indices=INTERNAL_INDEX)
+            logger.info(u'{} result: {}'.format('.django_engine/indices',
+                                                pprint.PrettyPrinter(indent=4).pformat(result)))
+        except ElasticSearchException:
             # MergeMappingException
             traceback.print_exc()
-            rebuild_index = True"""
+            rebuild_index = True
         # mappings for mapping_migration
         """mapping_migration = DocumentObjectField(
             name='mapping_migration',
