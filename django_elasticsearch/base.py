@@ -79,7 +79,7 @@ class DatabaseOperations(NonrelDatabaseOperations):
         """
         # "logstash-%{+YYYY.MM.dd}"
         alias = index_name if has_alias is True else None
-        index_name = u'{}-{}'.format(index_name, datetime.now().strftime("%Y.%m.%dT%H:%M:%S"))
+        index_name = u'{}-{}'.format(index_name, datetime.now().strftime("%Y.%m.%d"))
         es_connection = self.connection.connection
         index_settings = {
             'analysis': options.get('ANALYSIS', {}),
@@ -100,7 +100,7 @@ class DatabaseOperations(NonrelDatabaseOperations):
             'updated_on': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         }, INTERNAL_INDEX, 'indices')
         if has_alias:
-            logger.info(u'index "{}" aliased "{}" created'.format(index_name))
+            logger.info(u'index "{}" aliased "{}" created'.format(index_name, alias))
         else:
             logger.info(u'index "{}" created'.format(index_name))
         return index_name, alias
@@ -208,14 +208,23 @@ class DatabaseOperations(NonrelDatabaseOperations):
             connection=self.connection,
             index_name=INTERNAL_INDEX,
             properties={
-                'operation': StringField(index='not_analyzed'),
-                'index_name': StringField(index='not_analyzed'),
-                'alias': StringField(index='not_analyzed'),
-                'model': StringField(index='not_analyzed'),
-                'settings': ObjectField(),
-                'created_on': DateField(),
-                'updated_on': DateField(),
+                'operation': StringField(
+                    name='operation',
+                    index='not_analyzed'),
+                'index_name': StringField(
+                    name='index_name',
+                    index='not_analyzed'),
+                'alias': StringField(
+                    name='alias',
+                    index='not_analyzed'),
+                'model': StringField(
+                    name='model',
+                    index='not_analyzed'),
+                'settings': ObjectField(name='settings'),
+                'created_on': DateField(name='created_on'),
+                'updated_on': DateField(name='updated_on'),
             })
+        mapping_indices.add_property()
         try:
             result = self.connection.indices.put_mapping(doc_type='indices',
                                                          mapping=mapping_indices.as_dict(),

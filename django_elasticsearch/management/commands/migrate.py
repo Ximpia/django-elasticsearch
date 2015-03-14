@@ -33,6 +33,12 @@ class Command(BaseCommand):
         if engine != ENGINE:
             return super(Command, self).handle(**options)
         else:
+            try:
+                connection.ops.delete_index(global_index_name)
+                connection.ops.delete_index('.django_engine')
+            except:
+                pass
+
             connection.ops.build_django_engine_structure()
             try:
                 index_name_final, alias = connection.ops.create_index(global_index_name, options)
