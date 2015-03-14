@@ -8,12 +8,12 @@ from django.db import connections, DEFAULT_DB_ALIAS
 from django.core.management.base import BaseCommand
 
 # pyes
-from pyes.exceptions import IndexAlreadyExistsException
+from pyes.exceptions import IndexAlreadyExistsException, ElasticSearchException
 
 # django_elasticsearch
 from django_elasticsearch.mapping import model_to_mapping
 from django_elasticsearch.models import get_settings_by_meta
-from django_elasticsearch import ENGINE
+from django_elasticsearch import ENGINE, INTERNAL_INDEX
 
 __author__ = 'jorgealegre'
 
@@ -33,18 +33,21 @@ class Command(BaseCommand):
         if engine != ENGINE:
             return super(Command, self).handle(**options)
         else:
+
+            # project global index
             try:
-                connection.ops.delete_index(global_index_name)
-                connection.ops.delete_index('.django_engine')
-            except:
+                index_name_final, alias = connection.ops.create_index(global_index_name, options,
+                                                                      skip_register=True)
+                self.stdout.write(u'index "{}" created with physical name "{}"'.format(alias, index_name_final))
+            except (IndexAlreadyExistsException, ElasticSearchException):
+                print 'problem db project!!!!!'
                 pass
 
             connection.ops.build_django_engine_structure()
-            try:
-                index_name_final, alias = connection.ops.create_index(global_index_name, options)
-                self.stdout.write(u'index "{}" created with physical name "{}"'.format(alias, index_name_final))
-            except IndexAlreadyExistsException:
-                pass
+            # register create index for global
+            import sys
+            sys.exit(1)
+
             logger.debug(u'models: {}'.format(connection.introspection.models))
             for app_name, app_models in connection.introspection.models.iteritems():
                 for model in app_models:
