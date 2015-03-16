@@ -230,6 +230,11 @@ class DatabaseOperations(NonrelDatabaseOperations):
         return cmp(dict_from_index, mapping_as_dict) != 0
 
     def build_django_engine_structure(self):
+        """
+        Build and save .django_engine mappings for document types
+
+        :return:
+        """
         es_connection = self.connection.connection
         from django_elasticsearch.fields import DocumentObjectField, DateField, StringField, ObjectField
         # crete .django_engine index
