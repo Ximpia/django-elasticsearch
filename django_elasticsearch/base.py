@@ -215,6 +215,20 @@ class DatabaseOperations(NonrelDatabaseOperations):
         # 4. delete old index
         self.delete_index(index_name_physical)
 
+    @classmethod
+    def is_diff_mapping(cls, index_mappings, key, mapping_as_dict):
+        """
+        Checks if mappings differ
+
+        :param index_mappings:
+        :param key:
+        :param mapping_as_dict:
+        :return:
+        """
+        dict_from_index = filter(lambda x: x[0] == key,
+                                 index_mappings.indices[index_mappings.indices.keys()[0]])[0][1].as_dict()
+        return cmp(dict_from_index, mapping_as_dict) != 0
+
     def build_django_engine_structure(self):
         es_connection = self.connection.connection
         from django_elasticsearch.fields import DocumentObjectField, DateField, StringField, ObjectField
@@ -228,6 +242,7 @@ class DatabaseOperations(NonrelDatabaseOperations):
             traceback.print_exc()
             logger.info(u'Could not create index')
         # mappings for content index
+        index_mappings = es_connection.indices.get_mapping(indices=INTERNAL_INDEX)
         rebuild_index = False
         mapping_indices = DocumentObjectField(
             name='indices',
@@ -243,18 +258,20 @@ class DatabaseOperations(NonrelDatabaseOperations):
                 'updated_on': DateField(),
             })
 
-        logger.info(u'build_django_engine_structure :: "indices" mapping: {}'.format(
-            pprint.PrettyPrinter(indent=4).pformat(mapping_indices.as_dict())))
-        try:
-            result = es_connection.indices.put_mapping(doc_type='indices',
-                                                       mapping=mapping_indices,
-                                                       indices=INTERNAL_INDEX)
-            logger.info(u'{} result: {}'.format('.django_engine/indices',
-                                                pprint.PrettyPrinter(indent=4).pformat(result)))
-        except ElasticSearchException:
-            # MergeMappingException
-            traceback.print_exc()
-            rebuild_index = True
+        if self.is_diff_mapping(index_mappings, 'indices', mapping_indices.as_dict()):
+            logger.info(u'build_django_engine_structure :: "indices" mapping: {}'.format(
+                pprint.PrettyPrinter(indent=4).pformat(mapping_indices.as_dict())))
+            try:
+                result = es_connection.indices.put_mapping(doc_type='indices',
+                                                           mapping=mapping_indices,
+                                                           indices=INTERNAL_INDEX)
+                logger.info(u'{} result: {}'.format('.django_engine/indices',
+                                                    pprint.PrettyPrinter(indent=4).pformat(result)))
+                # register event of putting mapping
+            except ElasticSearchException:
+                # MergeMappingException
+                traceback.print_exc()
+                rebuild_index = True
         # mappings for mapping_migration
         mapping_migration = DocumentObjectField(
             name='mapping_migration',
@@ -268,18 +285,20 @@ class DatabaseOperations(NonrelDatabaseOperations):
                 'created_on': DateField(),
                 'updated_on': DateField(),
             })
-        logger.info(u'build_django_engine_structure :: "mapping_migration" mapping: {}'.format(
-            pprint.PrettyPrinter(indent=4).pformat(mapping_migration.as_dict())))
-        try:
-            result = es_connection.indices.put_mapping(doc_type='mapping_migration',
-                                                       mapping=mapping_migration,
-                                                       indices=INTERNAL_INDEX)
-            logger.info(u'{} result: {}'.format('.django_engine/mapping_migration',
-                                                pprint.PrettyPrinter(indent=4).pformat(result)))
-        except ElasticSearchException:
-            # MergeMappingException
-            traceback.print_exc()
-            rebuild_index = True
+        if self.is_diff_mapping(index_mappings, 'mapping_migration', mapping_migration.as_dict()):
+            logger.info(u'build_django_engine_structure :: "mapping_migration" mapping: {}'.format(
+                pprint.PrettyPrinter(indent=4).pformat(mapping_migration.as_dict())))
+            try:
+                result = es_connection.indices.put_mapping(doc_type='mapping_migration',
+                                                           mapping=mapping_migration,
+                                                           indices=INTERNAL_INDEX)
+                logger.info(u'{} result: {}'.format('.django_engine/mapping_migration',
+                                                    pprint.PrettyPrinter(indent=4).pformat(result)))
+                # register event of putting mapping
+            except ElasticSearchException:
+                # MergeMappingException
+                traceback.print_exc()
+                rebuild_index = True
         # model
         mapping_model = DocumentObjectField(
             name='model',
@@ -294,18 +313,20 @@ class DatabaseOperations(NonrelDatabaseOperations):
                 'created_on': DateField(),
                 'updated_on': DateField(),
             })
-        logger.info(u'build_django_engine_structure :: "model" mapping: {}'.format(
-            pprint.PrettyPrinter(indent=4).pformat(mapping_model.as_dict())))
-        try:
-            result = es_connection.indices.put_mapping(doc_type='model',
-                                                       mapping=mapping_model,
-                                                       indices=INTERNAL_INDEX)
-            logger.info(u'{} result: {}'.format('.django_engine/model',
-                                                pprint.PrettyPrinter(indent=4).pformat(result)))
-        except ElasticSearchException:
-            # MergeMappingException
-            traceback.print_exc()
-            rebuild_index = True
+        if self.is_diff_mapping(index_mappings, 'model', mapping_model.as_dict()):
+            logger.info(u'build_django_engine_structure :: "model" mapping: {}'.format(
+                pprint.PrettyPrinter(indent=4).pformat(mapping_model.as_dict())))
+            try:
+                result = es_connection.indices.put_mapping(doc_type='model',
+                                                           mapping=mapping_model,
+                                                           indices=INTERNAL_INDEX)
+                logger.info(u'{} result: {}'.format('.django_engine/model',
+                                                    pprint.PrettyPrinter(indent=4).pformat(result)))
+                # register event of putting mapping
+            except ElasticSearchException:
+                # MergeMappingException
+                traceback.print_exc()
+                rebuild_index = True
         # register log create internal index
         if rebuild_index:
             logger.debug(u'**** REBUILD INDEX ****** !!!!!!!!!!!!!!!!!!!!!!!!')
