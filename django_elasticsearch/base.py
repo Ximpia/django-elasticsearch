@@ -225,8 +225,12 @@ class DatabaseOperations(NonrelDatabaseOperations):
         :param mapping_as_dict:
         :return:
         """
-        dict_from_index = filter(lambda x: x[0] == key,
-                                 index_mappings.indices[index_mappings.indices.keys()[0]])[0][1].as_dict()
+        items = filter(lambda x: x[0] == key,
+                       index_mappings.indices[index_mappings.indices.keys()[0]])
+        logger.debug(u'is_diff_mapping :: items: {}'.format(items))
+        if not items:
+            return True
+        dict_from_index = items[0][1].as_dict()
         return cmp(dict_from_index, mapping_as_dict) != 0
 
     def build_django_engine_structure(self):
