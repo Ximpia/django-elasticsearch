@@ -277,6 +277,8 @@ class DatabaseOperations(NonrelDatabaseOperations):
                 # MergeMappingException
                 traceback.print_exc()
                 rebuild_index = True
+        else:
+            logger.debug(u'build_django_engine_structure :: mappings for "indices" have not changed')
         # mappings for mapping_migration
         mapping_migration = DocumentObjectField(
             name='mapping_migration',
@@ -304,6 +306,8 @@ class DatabaseOperations(NonrelDatabaseOperations):
                 # MergeMappingException
                 traceback.print_exc()
                 rebuild_index = True
+        else:
+            logger.debug(u'build_django_engine_structure :: mappings for "mapping_migration" have not changed')
         # model
         mapping_model = DocumentObjectField(
             name='model',
@@ -332,6 +336,8 @@ class DatabaseOperations(NonrelDatabaseOperations):
                 # MergeMappingException
                 traceback.print_exc()
                 rebuild_index = True
+        else:
+            logger.debug(u'build_django_engine_structure :: mappings for "model" have not changed')
         # register log create internal index
         if rebuild_index:
             logger.debug(u'**** REBUILD INDEX ****** !!!!!!!!!!!!!!!!!!!!!!!!')
