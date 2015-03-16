@@ -18,6 +18,8 @@ ENGINE = 'django_elasticsearch'
 NUMBER_OF_REPLICAS = 1
 NUMBER_OF_SHARDS = 5
 INTERNAL_INDEX = '.django_engine'
+OPERATION_DELETE_INDEX = 'delete_index'
+OPERATION_CREATE_INDEX = 'create_index'
 
 
 def get_installed_apps():

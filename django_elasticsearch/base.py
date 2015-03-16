@@ -33,7 +33,8 @@ import pyes.mappings
 # djes
 from creation import DatabaseCreation
 from schema import DatabaseSchemaEditor
-from . import ENGINE, NUMBER_OF_REPLICAS, NUMBER_OF_SHARDS, INTERNAL_INDEX
+from . import ENGINE, NUMBER_OF_REPLICAS, NUMBER_OF_SHARDS, INTERNAL_INDEX, \
+    OPERATION_CREATE_INDEX, OPERATION_DELETE_INDEX
 from mapping import model_to_mapping
 import exceptions
 
@@ -94,7 +95,7 @@ class DatabaseOperations(NonrelDatabaseOperations):
         if not skip_register:
             # save index creation data
             es_connection.index({
-                'operation': 'create_index',
+                'operation': OPERATION_CREATE_INDEX,
                 'index_name': index_name,
                 'alias': alias,
                 'settings': index_settings,
@@ -107,7 +108,7 @@ class DatabaseOperations(NonrelDatabaseOperations):
             logger.info(u'index "{}" created'.format(index_name))
         return index_name, alias
 
-    def delete_index(self, index_name):
+    def delete_index(self, index_name, skip_register=False):
         """
         Deletes index
 
@@ -117,13 +118,34 @@ class DatabaseOperations(NonrelDatabaseOperations):
         es_connection = self.connection.connection
         es_connection.indices.delete_index(index_name)
         # save index creation data
+        if not skip_register:
+            es_connection.index({
+                'operation': OPERATION_DELETE_INDEX,
+                'alias': index_name,
+                'created_on': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                'updated_on': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            }, INTERNAL_INDEX, 'indices')
+        logger.info(u'index "{}" deleted'.format(index_name))
+
+    def register_index_operation(self, index_name, operation):
+        """
+        Register index operation
+
+        :param index_name:
+        :param operation:
+        :return:
+        """
+        es_connection = self.connection.connection
         es_connection.index({
-            'operation': 'delete_index',
+            'operation': operation,
             'alias': index_name,
             'created_on': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             'updated_on': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         }, INTERNAL_INDEX, 'indices')
-        logger.info(u'index "{}" deleted'.format(index_name))
+        logger.info(u'register_index_operation :: operation: {} index: {}'.format(
+            operation,
+            index_name,
+        ))
 
     def rebuild_index(self, alias):
         """
@@ -197,7 +219,6 @@ class DatabaseOperations(NonrelDatabaseOperations):
         es_connection = self.connection.connection
         from django_elasticsearch.fields import DocumentObjectField, DateField, StringField, ObjectField
         # crete .django_engine index
-        # logger.debug(u'indices: {}'.format(es_connection.indices.get_indices(include_aliases=True)))
         try:
             self.create_index(INTERNAL_INDEX, {
                 'number_of_replicas': 1,
@@ -222,7 +243,7 @@ class DatabaseOperations(NonrelDatabaseOperations):
                 'updated_on': DateField(),
             })
 
-        logger.info(u'build_django_engine_structure :: mapping: {}'.format(
+        logger.info(u'build_django_engine_structure :: "indices" mapping: {}'.format(
             pprint.PrettyPrinter(indent=4).pformat(mapping_indices.as_dict())))
         try:
             result = es_connection.indices.put_mapping(doc_type='indices',
@@ -235,7 +256,7 @@ class DatabaseOperations(NonrelDatabaseOperations):
             traceback.print_exc()
             rebuild_index = True
         # mappings for mapping_migration
-        """mapping_migration = DocumentObjectField(
+        mapping_migration = DocumentObjectField(
             name='mapping_migration',
             connection=self.connection,
             index_name=INTERNAL_INDEX,
@@ -247,13 +268,15 @@ class DatabaseOperations(NonrelDatabaseOperations):
                 'created_on': DateField(),
                 'updated_on': DateField(),
             })
+        logger.info(u'build_django_engine_structure :: "mapping_migration" mapping: {}'.format(
+            pprint.PrettyPrinter(indent=4).pformat(mapping_migration.as_dict())))
         try:
-            result = self.connection.indices.put_mapping(doc_type='mapping_migration',
-                                                         mapping=mapping_migration.as_dict(),
-                                                         indices=INTERNAL_INDEX)
+            result = es_connection.indices.put_mapping(doc_type='mapping_migration',
+                                                       mapping=mapping_migration,
+                                                       indices=INTERNAL_INDEX)
             logger.info(u'{} result: {}'.format('.django_engine/mapping_migration',
                                                 pprint.PrettyPrinter(indent=4).pformat(result)))
-        except Exception:
+        except ElasticSearchException:
             # MergeMappingException
             traceback.print_exc()
             rebuild_index = True
@@ -271,19 +294,22 @@ class DatabaseOperations(NonrelDatabaseOperations):
                 'created_on': DateField(),
                 'updated_on': DateField(),
             })
+        logger.info(u'build_django_engine_structure :: "model" mapping: {}'.format(
+            pprint.PrettyPrinter(indent=4).pformat(mapping_model.as_dict())))
         try:
-            result = self.connection.indices.put_mapping(doc_type='model',
-                                                         mapping=mapping_model.as_dict(),
-                                                         indices=INTERNAL_INDEX)
+            result = es_connection.indices.put_mapping(doc_type='model',
+                                                       mapping=mapping_model,
+                                                       indices=INTERNAL_INDEX)
             logger.info(u'{} result: {}'.format('.django_engine/model',
                                                 pprint.PrettyPrinter(indent=4).pformat(result)))
-        except Exception:
+        except ElasticSearchException:
             # MergeMappingException
             traceback.print_exc()
             rebuild_index = True
         # register log create internal index
         if rebuild_index:
-            self.rebuild_index(INTERNAL_INDEX)"""
+            logger.debug(u'**** REBUILD INDEX ****** !!!!!!!!!!!!!!!!!!!!!!!!')
+            # self.rebuild_index(INTERNAL_INDEX)
 
 
 class DatabaseClient(NonrelDatabaseClient):
