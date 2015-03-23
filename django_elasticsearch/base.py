@@ -215,24 +215,6 @@ class DatabaseOperations(NonrelDatabaseOperations):
         # 4. delete old index
         self.delete_index(index_name_physical)
 
-    @classmethod
-    def is_diff_mapping(cls, index_mappings, key, mapping_as_dict):
-        """
-        Checks if mappings differ
-
-        :param index_mappings:
-        :param key:
-        :param mapping_as_dict:
-        :return:
-        """
-        items = filter(lambda x: x[0] == key,
-                       index_mappings.indices[index_mappings.indices.keys()[0]])
-        logger.debug(u'is_diff_mapping :: items: {}'.format(items))
-        if not items:
-            return True
-        dict_from_index = items[0][1].as_dict()
-        return cmp(dict_from_index, mapping_as_dict) != 0
-
     def build_django_engine_structure(self):
         """
         Build and save .django_engine mappings for document types
