@@ -29,6 +29,7 @@ from pyes import ES
 from pyes.exceptions import IndexAlreadyExistsException, IndexMissingException, ElasticSearchException
 from pyes.query import Search, QueryStringQuery
 import pyes.mappings
+from pyes.helpers import SettingsBuilder
 
 # djes
 from creation import DatabaseCreation
@@ -67,7 +68,8 @@ class DatabaseOperations(NonrelDatabaseOperations):
         """
         pass
 
-    def create_index(self, index_name, options, has_alias=True, model=None, skip_register=False):
+    def create_index(self, index_name, options=None, has_alias=True, model=None,
+                     skip_register=False, index_settings=None):
         """
         Creates index with options as settings
 
@@ -83,11 +85,12 @@ class DatabaseOperations(NonrelDatabaseOperations):
         alias = index_name if has_alias is True else None
         index_name = u'{}-{}'.format(index_name, datetime.now().strftime("%Y.%m.%d"))
         es_connection = self.connection.connection
-        index_settings = {
-            'analysis': options.get('ANALYSIS', {}),
-            'number_of_replicas': options.get('NUMBER_OF_REPLICAS', NUMBER_OF_REPLICAS),
-            'number_of_shards': options.get('NUMBER_OF_SHARDS', NUMBER_OF_SHARDS),
-        }
+        if index_settings is None and options is not None:
+            index_settings = {
+                'analysis': options.get('ANALYSIS', {}),
+                'number_of_replicas': options.get('NUMBER_OF_REPLICAS', NUMBER_OF_REPLICAS),
+                'number_of_shards': options.get('NUMBER_OF_SHARDS', NUMBER_OF_SHARDS),
+            }
         es_connection.indices.create_index(index_name, settings=index_settings)
         # alias
         if has_alias:
@@ -146,6 +149,23 @@ class DatabaseOperations(NonrelDatabaseOperations):
             operation,
             index_name,
         ))
+
+    def register_mapping_update(self, index_name, mapping):
+        """
+        Register mapping update, writing sent mapping, current mapping at ES, and ES
+        processed mapping after sent (returned by ES)
+
+        :param index_name:
+        :param mapping:
+        :return:
+        """
+        es_connection = self.connection.connection
+        es_connection.index({
+            'operation': operation,
+            'alias': index_name,
+            'created_on': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            'updated_on': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        }, INTERNAL_INDEX, 'indices')
 
     def rebuild_index(self, alias):
         """
@@ -221,113 +241,71 @@ class DatabaseOperations(NonrelDatabaseOperations):
 
         :return:
         """
-        es_connection = self.connection.connection
-        from django_elasticsearch.fields import DocumentObjectField, DateField, StringField, ObjectField
+        from django_elasticsearch.fields import DocumentObjectField, DateField, StringField, ObjectField, \
+            IntegerField
         # crete .django_engine index
         try:
-            self.create_index(INTERNAL_INDEX, {
+            # build settings
+            # attach mappings to settings
+            options = {
                 'number_of_replicas': 1,
-                'number_of_shards': 5,
-            }, skip_register=True)
+                'number_of_shards': 1,
+            }
+            mappings = {
+                'indices': DocumentObjectField(
+                    name='indices',
+                    connection=self.connection,
+                    index_name=INTERNAL_INDEX,
+                    properties={
+                        'operation': StringField(index='not_analyzed'),
+                        'index_name': StringField(index='not_analyzed'),
+                        'alias': StringField(index='not_analyzed'),
+                        'model': StringField(index='not_analyzed'),
+                        'settings': ObjectField(),
+                        'created_on': DateField(),
+                        'updated_on': DateField(),
+                        }),
+                'mapping_migration': DocumentObjectField(
+                    name='mapping_migration',
+                    connection=self.connection,
+                    index_name=INTERNAL_INDEX,
+                    properties={
+                        'operation': StringField(index='not_analyzed'),
+                        'doc_type': StringField(index='not_analyzed'),
+                        'sequence': IntegerField(),
+                        'mapping': StringField(index='not_analyzed'),
+                        'mapping_server': StringField(index='not_analyzed'),
+                        'mapping_old': StringField(index='not_analyzed'),
+                        'created_on': DateField(),
+                        'updated_on': DateField(),
+                    }),
+                'model': DocumentObjectField(
+                    name='model',
+                    connection=self.connection,
+                    index_name=INTERNAL_INDEX,
+                    properties={
+                        'index_name': StringField(index='not_analyzed'),
+                        'alias': StringField(index='not_analyzed'),
+                        'model': StringField(index='not_analyzed'),
+                        'mapping': StringField(index='not_analyzed'),
+                        'settings': ObjectField(),
+                        'created_on': DateField(),
+                        'updated_on': DateField(),
+                    }),
+            }
+            logger.info(u'build_django_engine_structure :: mapping: {}'.format(
+                pprint.PrettyPrinter(indent=4).pformat(mappings)))
+            index_settings = SettingsBuilder(options, mappings)
+            self.create_index(INTERNAL_INDEX, index_settings=index_settings, skip_register=True)
+            # register index operation
+            self.register_index_operation(INTERNAL_INDEX, OPERATION_CREATE_INDEX)
+            # register mapping update
+            self.register_mapping_update(INTERNAL_INDEX, mappings['indices'])
+            self.register_mapping_update(INTERNAL_INDEX, mappings['mapping_migration'])
+            self.register_mapping_update(INTERNAL_INDEX, mappings['model'])
         except (IndexAlreadyExistsException, ElasticSearchException):
             traceback.print_exc()
             logger.info(u'Could not create index')
-        # mappings for content index
-        index_mappings = es_connection.indices.get_mapping(indices=INTERNAL_INDEX)
-        rebuild_index = False
-        mapping_indices = DocumentObjectField(
-            name='indices',
-            connection=self.connection,
-            index_name=INTERNAL_INDEX,
-            properties={
-                'operation': StringField(index='not_analyzed'),
-                'index_name': StringField(index='not_analyzed'),
-                'alias': StringField(index='not_analyzed'),
-                'model': StringField(index='not_analyzed'),
-                'settings': ObjectField(),
-                'created_on': DateField(),
-                'updated_on': DateField(),
-            })
-
-        if self.is_diff_mapping(index_mappings, 'indices', mapping_indices.as_dict()):
-            logger.info(u'build_django_engine_structure :: "indices" mapping: {}'.format(
-                pprint.PrettyPrinter(indent=4).pformat(mapping_indices.as_dict())))
-            try:
-                result = es_connection.indices.put_mapping(doc_type='indices',
-                                                           mapping=mapping_indices,
-                                                           indices=INTERNAL_INDEX)
-                logger.info(u'{} result: {}'.format('.django_engine/indices',
-                                                    pprint.PrettyPrinter(indent=4).pformat(result)))
-                # register event of putting mapping
-            except ElasticSearchException:
-                # MergeMappingException
-                traceback.print_exc()
-                rebuild_index = True
-        else:
-            logger.debug(u'build_django_engine_structure :: mappings for "indices" have not changed')
-        # mappings for mapping_migration
-        mapping_migration = DocumentObjectField(
-            name='mapping_migration',
-            connection=self.connection,
-            index_name=INTERNAL_INDEX,
-            properties={
-                'operation': StringField(index='not_analyzed'),
-                'doc_type': StringField(index='not_analyzed'),
-                'mapping_old': StringField(index='not_analyzed'),
-                'mapping_new': StringField(index='not_analyzed'),
-                'created_on': DateField(),
-                'updated_on': DateField(),
-            })
-        if self.is_diff_mapping(index_mappings, 'mapping_migration', mapping_migration.as_dict()):
-            logger.info(u'build_django_engine_structure :: "mapping_migration" mapping: {}'.format(
-                pprint.PrettyPrinter(indent=4).pformat(mapping_migration.as_dict())))
-            try:
-                result = es_connection.indices.put_mapping(doc_type='mapping_migration',
-                                                           mapping=mapping_migration,
-                                                           indices=INTERNAL_INDEX)
-                logger.info(u'{} result: {}'.format('.django_engine/mapping_migration',
-                                                    pprint.PrettyPrinter(indent=4).pformat(result)))
-                # register event of putting mapping
-            except ElasticSearchException:
-                # MergeMappingException
-                traceback.print_exc()
-                rebuild_index = True
-        else:
-            logger.debug(u'build_django_engine_structure :: mappings for "mapping_migration" have not changed')
-        # model
-        mapping_model = DocumentObjectField(
-            name='model',
-            connection=self.connection,
-            index_name=INTERNAL_INDEX,
-            properties={
-                'index_name': StringField(index='not_analyzed'),
-                'alias': StringField(index='not_analyzed'),
-                'model': StringField(index='not_analyzed'),
-                'mapping': StringField(index='not_analyzed'),
-                'settings': ObjectField(),
-                'created_on': DateField(),
-                'updated_on': DateField(),
-            })
-        if self.is_diff_mapping(index_mappings, 'model', mapping_model.as_dict()):
-            logger.info(u'build_django_engine_structure :: "model" mapping: {}'.format(
-                pprint.PrettyPrinter(indent=4).pformat(mapping_model.as_dict())))
-            try:
-                result = es_connection.indices.put_mapping(doc_type='model',
-                                                           mapping=mapping_model,
-                                                           indices=INTERNAL_INDEX)
-                logger.info(u'{} result: {}'.format('.django_engine/model',
-                                                    pprint.PrettyPrinter(indent=4).pformat(result)))
-                # register event of putting mapping
-            except ElasticSearchException:
-                # MergeMappingException
-                traceback.print_exc()
-                rebuild_index = True
-        else:
-            logger.debug(u'build_django_engine_structure :: mappings for "model" have not changed')
-        # register log create internal index
-        if rebuild_index:
-            logger.debug(u'**** REBUILD INDEX ****** !!!!!!!!!!!!!!!!!!!!!!!!')
-            # self.rebuild_index(INTERNAL_INDEX)
 
 
 class DatabaseClient(NonrelDatabaseClient):
