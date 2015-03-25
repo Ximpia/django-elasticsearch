@@ -35,7 +35,7 @@ from pyes.helpers import SettingsBuilder
 from creation import DatabaseCreation
 from schema import DatabaseSchemaEditor
 from . import ENGINE, NUMBER_OF_REPLICAS, NUMBER_OF_SHARDS, INTERNAL_INDEX, \
-    OPERATION_CREATE_INDEX, OPERATION_DELETE_INDEX
+    OPERATION_CREATE_INDEX, OPERATION_DELETE_INDEX, OPERATION_UPDATE_MAPPING
 from mapping import model_to_mapping
 import exceptions
 
@@ -125,8 +125,8 @@ class DatabaseOperations(NonrelDatabaseOperations):
             es_connection.index({
                 'operation': OPERATION_DELETE_INDEX,
                 'alias': index_name,
-                'created_on': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                'updated_on': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                'created_on': datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
+                'updated_on': datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
             }, INTERNAL_INDEX, 'indices')
         logger.info(u'index "{}" deleted'.format(index_name))
 
@@ -142,15 +142,15 @@ class DatabaseOperations(NonrelDatabaseOperations):
         es_connection.index({
             'operation': operation,
             'alias': index_name,
-            'created_on': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            'updated_on': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            'created_on': datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
+            'updated_on': datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
         }, INTERNAL_INDEX, 'indices')
         logger.info(u'register_index_operation :: operation: {} index: {}'.format(
             operation,
             index_name,
         ))
 
-    def register_mapping_update(self, index_name, mapping):
+    def register_mapping_update(self, index_name, mapping, mapping_old=''):
         """
         Register mapping update, writing sent mapping, current mapping at ES, and ES
         processed mapping after sent (returned by ES)
@@ -159,13 +159,27 @@ class DatabaseOperations(NonrelDatabaseOperations):
         :param mapping:
         :return:
         """
+        import base64
+        mapping_dict = mapping
+        if not isinstance(mapping, dict):
+            mapping_dict = mapping.as_dict()
         es_connection = self.connection.connection
+        # TODO get last sequence, add by one and have format
+        # '{0:05d}'.format(2)
+        path = u'/{}/_mapping/{}/'.format(mapping.index_name, mapping.name)
+        result = es_connection._send_request('GET', path)
+        mapping_server = result[result.keys()[0]]['mappings']
         es_connection.index({
-            'operation': operation,
-            'alias': index_name,
-            'created_on': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            'updated_on': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        }, INTERNAL_INDEX, 'indices')
+            'operation': OPERATION_UPDATE_MAPPING,
+            'doc_type': mapping.name,
+            'index_name': mapping.index_name,
+            'sequence': '99999',
+            'mapping': base64.encodestring(json.dumps(mapping_dict)),
+            'mapping_old': mapping_old,
+            'mapping_server': base64.encodestring(json.dumps(mapping_server)),
+            'created_on': datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
+            'updated_on': datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
+        }, INTERNAL_INDEX, 'mapping_migration')
 
     def rebuild_index(self, alias):
         """
@@ -243,7 +257,8 @@ class DatabaseOperations(NonrelDatabaseOperations):
         """
         from django_elasticsearch.fields import DocumentObjectField, DateField, StringField, ObjectField, \
             IntegerField
-        # crete .django_engine index
+        es_connection = self.connection.connection
+        # create .django_engine index
         try:
             # build settings
             # attach mappings to settings
@@ -251,58 +266,74 @@ class DatabaseOperations(NonrelDatabaseOperations):
                 'number_of_replicas': 1,
                 'number_of_shards': 1,
             }
-            mappings = {
-                'indices': DocumentObjectField(
-                    name='indices',
-                    connection=self.connection,
-                    index_name=INTERNAL_INDEX,
-                    properties={
-                        'operation': StringField(index='not_analyzed'),
-                        'index_name': StringField(index='not_analyzed'),
-                        'alias': StringField(index='not_analyzed'),
-                        'model': StringField(index='not_analyzed'),
-                        'settings': ObjectField(),
-                        'created_on': DateField(),
-                        'updated_on': DateField(),
-                        }),
-                'mapping_migration': DocumentObjectField(
-                    name='mapping_migration',
-                    connection=self.connection,
-                    index_name=INTERNAL_INDEX,
-                    properties={
-                        'operation': StringField(index='not_analyzed'),
-                        'doc_type': StringField(index='not_analyzed'),
-                        'sequence': IntegerField(),
-                        'mapping': StringField(index='not_analyzed'),
-                        'mapping_server': StringField(index='not_analyzed'),
-                        'mapping_old': StringField(index='not_analyzed'),
-                        'created_on': DateField(),
-                        'updated_on': DateField(),
-                    }),
-                'model': DocumentObjectField(
-                    name='model',
-                    connection=self.connection,
-                    index_name=INTERNAL_INDEX,
-                    properties={
-                        'index_name': StringField(index='not_analyzed'),
-                        'alias': StringField(index='not_analyzed'),
-                        'model': StringField(index='not_analyzed'),
-                        'mapping': StringField(index='not_analyzed'),
-                        'settings': ObjectField(),
-                        'created_on': DateField(),
-                        'updated_on': DateField(),
-                    }),
-            }
-            logger.info(u'build_django_engine_structure :: mapping: {}'.format(
-                pprint.PrettyPrinter(indent=4).pformat(mappings)))
-            index_settings = SettingsBuilder(options, mappings)
-            self.create_index(INTERNAL_INDEX, index_settings=index_settings, skip_register=True)
+            # index_settings = SettingsBuilder(options, mappings)
+            self.create_index(INTERNAL_INDEX, options=options, skip_register=True)
+            # indices
+            mapping_indices = DocumentObjectField(
+                name='indices',
+                connection=self.connection,
+                index_name=INTERNAL_INDEX,
+                properties={
+                    'operation': StringField(index='not_analyzed'),
+                    'index_name': StringField(index='not_analyzed'),
+                    'alias': StringField(index='not_analyzed'),
+                    'model': StringField(index='not_analyzed'),
+                    'settings': ObjectField(),
+                    'created_on': DateField(),
+                    'updated_on': DateField(),
+                })
+            result = es_connection.indices.put_mapping(doc_type='indices',
+                                                       mapping=mapping_indices,
+                                                       indices=INTERNAL_INDEX)
+            logger.info(u'{} result: {}'.format('.django_engine/indices',
+                                                pprint.PrettyPrinter(indent=4).pformat(result)))
+            # mapping_migration
+            mapping_migration = DocumentObjectField(
+                name='mapping_migration',
+                connection=self.connection,
+                index_name=INTERNAL_INDEX,
+                properties={
+                    'operation': StringField(index='not_analyzed'),
+                    'doc_type': StringField(index='not_analyzed'),
+                    'index_name': StringField(index='not_analyzed'),
+                    'sequence': IntegerField(),
+                    'mapping': StringField(index='not_analyzed'),
+                    'mapping_server': StringField(index='not_analyzed'),
+                    'mapping_old': StringField(index='not_analyzed'),
+                    'created_on': DateField(),
+                    'updated_on': DateField(),
+                })
+            result = es_connection.indices.put_mapping(doc_type='mapping_migration',
+                                                       mapping=mapping_migration,
+                                                       indices=INTERNAL_INDEX)
+            logger.info(u'{} result: {}'.format('.django_engine/mapping_migration',
+                                                pprint.PrettyPrinter(indent=4).pformat(result)))
+            # model
+            mapping_model = DocumentObjectField(
+                name='model',
+                connection=self.connection,
+                index_name=INTERNAL_INDEX,
+                properties={
+                    'index_name': StringField(index='not_analyzed'),
+                    'alias': StringField(index='not_analyzed'),
+                    'model': StringField(index='not_analyzed'),
+                    'mapping': StringField(index='not_analyzed'),
+                    'settings': ObjectField(),
+                    'created_on': DateField(),
+                    'updated_on': DateField(),
+                })
+            result = es_connection.indices.put_mapping(doc_type='model',
+                                                       mapping=mapping_model,
+                                                       indices=INTERNAL_INDEX)
+            logger.info(u'{} result: {}'.format('.django_engine/model',
+                                                pprint.PrettyPrinter(indent=4).pformat(result)))
+
             # register index operation
             self.register_index_operation(INTERNAL_INDEX, OPERATION_CREATE_INDEX)
             # register mapping update
-            self.register_mapping_update(INTERNAL_INDEX, mappings['indices'])
-            self.register_mapping_update(INTERNAL_INDEX, mappings['mapping_migration'])
-            self.register_mapping_update(INTERNAL_INDEX, mappings['model'])
+            self.register_mapping_update(INTERNAL_INDEX, mapping_indices)
+            self.register_mapping_update(INTERNAL_INDEX, mapping_migration)
+            self.register_mapping_update(INTERNAL_INDEX, mapping_model)
         except (IndexAlreadyExistsException, ElasticSearchException):
             traceback.print_exc()
             logger.info(u'Could not create index')

@@ -78,6 +78,16 @@ class IntegerField(mappings.IntegerField):
     def __init__(self, *args, **kwargs):
         super(IntegerField, self).__init__(*args, **kwargs)
 
+    def as_dict(self):
+        map_ = super(IntegerField, self).as_dict()
+        if self.index is False and self.tokenize is False:
+            map_['index'] = 'no'
+        elif self.index is True and self.tokenize is False:
+            map_['index'] = 'not_analyzed'
+        elif self.index is True and self.tokenize is True:
+            map_['index'] = 'analyzed'
+        return map_
+
 
 class LongField(mappings.LongField):
 
