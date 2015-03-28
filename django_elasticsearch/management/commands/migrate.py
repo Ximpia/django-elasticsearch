@@ -43,26 +43,23 @@ class Command(BaseCommand):
                 connection.ops.register_index_operation(global_index_name, OPERATION_CREATE_INDEX,
                                                         connection.ops.build_es_settings_from_django(options))
             except (IndexAlreadyExistsException, ElasticSearchException):
+                import traceback
+                logger.error(traceback.format_exc())
                 self.stderr.write(u'Could not create index, already exists')
-                pass
-
-            import sys
-            sys.exit(1)
 
             logger.debug(u'models: {}'.format(connection.introspection.models))
             for app_name, app_models in connection.introspection.models.iteritems():
                 for model in app_models:
-                    self.stdout.write(u'Creating mappings for {}.{}'.format(app_name, model.__name__))
                     mapping = model_to_mapping(model, es_connection, global_index_name)
                     try:
                         mapping.save()
-                        self.stdout.write(u'Mapping updated')
+                        self.stdout.write(u'Mapping for model {}.{} updated'.format(model.__name__))
                     except Exception as e:
-                        self.stdout.write(u'Could not update mapping, rebuilding global index...')
-                        connection.ops.rebuild_index(global_index_name)
-                        mapping.save()
-                    logger.debug(u'Created mapping: {}'.format(
-                        pprint.PrettyPrinter(indent=4).pformat(mapping.as_dict())))
+                        import traceback
+                        logger.error(traceback.format_exc())
+                        self.stderr.write(u'Could not update mapping, rebuilding global index...')
+                        # connection.ops.rebuild_index(global_index_name)
+                        # mapping.save()
                     if not hasattr(model._meta, 'indices'):
                         continue
                     """for model_index in model._meta.indices:

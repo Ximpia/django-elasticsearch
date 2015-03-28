@@ -171,7 +171,9 @@ class DatabaseOperations(NonrelDatabaseOperations):
         # TODO get last sequence, add by one and have format
         # '{0:05d}'.format(2)
         path = u'/{}/_mapping/{}/'.format(mapping.index_name, mapping.name)
+        logger.debug(u'register_mapping_update :: path: {}'.format(path))
         result = es_connection._send_request('GET', path)
+        logger.debug(u'register_mapping_update :: result: {}'.format(result))
         mapping_server = result[result.keys()[0]]['mappings']
         es_connection.index({
             'operation': OPERATION_UPDATE_MAPPING,
@@ -188,6 +190,20 @@ class DatabaseOperations(NonrelDatabaseOperations):
             index_name,
             mapping.name,
         ))
+
+    def get_mappings(self, index_name, doc_type):
+        """
+        Get mappings for index and doc_type in dict form
+
+        :param index_name:
+        :param doc_type:
+        :return: dictionary with mapping on ElasticSearch
+        """
+        es_connection = self.connection.connection
+        path = u'/{}/_mapping/{}/'.format(index_name, doc_type)
+        result = es_connection._send_request('GET', path)
+        mapping_dict = result[result.keys()[0]]['mappings']
+        return mapping_dict
 
     def rebuild_index(self, alias):
         """
@@ -269,7 +285,7 @@ class DatabaseOperations(NonrelDatabaseOperations):
             'number_of_replicas': options.get('NUMBER_OF_REPLICAS', 1),
             'number_of_shards': options.get('NUMBER_OF_SHARDS', 5),
         })
-        if 'ANALYSIS' in options and options['analysis'].keys():
+        if 'ANALYSIS' in options and options['ANALYSIS'].keys():
             es_settings['analysis'] = options.get('ANALYSIS', '')
         return es_settings
 

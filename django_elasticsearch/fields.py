@@ -234,21 +234,13 @@ class DocumentObjectField(ObjectField):
         if self.connection is None:
             raise RuntimeError(u"No connection available")
         try:
-            mappings_old = self.connection.indices.get_mapping(doc_type=self.name,
-                                                               indices=self.index_name)
             result = self.connection.indices.put_mapping(doc_type=self.name,
-                                                         mapping=self.as_dict(),
+                                                         mapping=self,
                                                          indices=self.index_name)
-            logger.info(u'result: {}'.format(pprint.PrettyPrinter(indent=4).pformat(result)))
-            # update internal .django_engine index
-            self.connection.index({
-                'operation': 'put_mapping',
-                'doc_type': self.name,
-                'mapping_old': json.dumps(mappings_old.as_dict()),
-                'mapping_new':  json.dumps(result.as_dict()),
-                'created_on': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                'updated_on': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            }, INTERNAL_INDEX, 'mapping_migration')
+            logger.info(u'DocumentObjectField :: result: {}'
+                        .format(pprint.PrettyPrinter(indent=4).pformat(result)))
+            self.connection.ops.register_mapping_update(self.index_name, self, old_mapping)
+
         except Exception:
             # reindex
             # MergeMappingException
@@ -257,6 +249,8 @@ class DocumentObjectField(ObjectField):
             # 3. assign alias to new index
             # 4. delete old index
             # TODO: Implement model reindex
+            import traceback
+            logger.error(traceback.format_exc())
             logger.info(u'Could not update mappings for doc_type:"{}"'.format(self.name))
 
     def __repr__(self):
