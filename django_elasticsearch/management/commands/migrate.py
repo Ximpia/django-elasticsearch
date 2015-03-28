@@ -43,8 +43,8 @@ class Command(BaseCommand):
                 connection.ops.register_index_operation(global_index_name, OPERATION_CREATE_INDEX,
                                                         connection.ops.build_es_settings_from_django(options))
             except (IndexAlreadyExistsException, ElasticSearchException):
-                import traceback
-                logger.error(traceback.format_exc())
+                """import traceback
+                logger.error(traceback.format_exc())"""
                 self.stderr.write(u'Could not create index, already exists')
 
             logger.debug(u'models: {}'.format(connection.introspection.models))
@@ -53,7 +53,7 @@ class Command(BaseCommand):
                     mapping = model_to_mapping(model, es_connection, global_index_name)
                     try:
                         mapping.save()
-                        self.stdout.write(u'Mapping for model {}.{} updated'.format(model.__name__))
+                        self.stdout.write(u'Mapping for model {}.{} updated'.format(app_name, model.__name__))
                     except Exception as e:
                         import traceback
                         logger.error(traceback.format_exc())

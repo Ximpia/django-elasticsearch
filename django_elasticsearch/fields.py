@@ -6,6 +6,7 @@ from datetime import datetime
 
 # django
 from collections import OrderedDict
+from django.db import connections, DEFAULT_DB_ALIAS
 
 # pyes
 from pyes import mappings
@@ -231,15 +232,21 @@ class DocumentObjectField(ObjectField):
         return result
 
     def save(self):
+        """
+        Save mapping, registering into .django_engine internal index
+
+        :return:
+        """
         if self.connection is None:
             raise RuntimeError(u"No connection available")
         try:
-            result = self.connection.indices.put_mapping(doc_type=self.name,
-                                                         mapping=self,
-                                                         indices=self.index_name)
-            logger.info(u'DocumentObjectField :: result: {}'
-                        .format(pprint.PrettyPrinter(indent=4).pformat(result)))
-            self.connection.ops.register_mapping_update(self.index_name, self, old_mapping)
+            connection = connections[DEFAULT_DB_ALIAS]
+            es_connection = self.connection
+            mappings_old = connection.ops.get_mappings(self.index_name, self.name)
+            es_connection.indices.put_mapping(doc_type=self.name,
+                                              mapping=self,
+                                              indices=self.index_name)
+            connection.ops.register_mapping_update(self.index_name, self, mappings_old)
 
         except Exception:
             # reindex

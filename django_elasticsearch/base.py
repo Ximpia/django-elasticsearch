@@ -171,10 +171,12 @@ class DatabaseOperations(NonrelDatabaseOperations):
         # TODO get last sequence, add by one and have format
         # '{0:05d}'.format(2)
         path = u'/{}/_mapping/{}/'.format(mapping.index_name, mapping.name)
-        logger.debug(u'register_mapping_update :: path: {}'.format(path))
+        # logger.debug(u'register_mapping_update :: path: {}'.format(path))
         result = es_connection._send_request('GET', path)
-        logger.debug(u'register_mapping_update :: result: {}'.format(result))
+        # logger.debug(u'register_mapping_update :: result: {}'.format(result))
         mapping_server = result[result.keys()[0]]['mappings']
+        if isinstance(mapping_old, dict):
+            mapping_old = base64.encodestring(json.dumps(mapping_dict))
         es_connection.index({
             'operation': OPERATION_UPDATE_MAPPING,
             'doc_type': mapping.name,
@@ -202,7 +204,10 @@ class DatabaseOperations(NonrelDatabaseOperations):
         es_connection = self.connection.connection
         path = u'/{}/_mapping/{}/'.format(index_name, doc_type)
         result = es_connection._send_request('GET', path)
-        mapping_dict = result[result.keys()[0]]['mappings']
+        try:
+            mapping_dict = result[result.keys()[0]]['mappings']
+        except IndexError:
+            mapping_dict = {}
         return mapping_dict
 
     def rebuild_index(self, alias):
