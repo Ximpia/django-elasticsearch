@@ -130,7 +130,7 @@ class DatabaseOperations(NonrelDatabaseOperations):
             }, INTERNAL_INDEX, 'indices')
         logger.info(u'index "{}" deleted'.format(index_name))
 
-    def register_index_operation(self, index_name, operation):
+    def register_index_operation(self, index_name, operation, index_settings, model=None):
         """
         Register index operation
 
@@ -139,9 +139,13 @@ class DatabaseOperations(NonrelDatabaseOperations):
         :return:
         """
         es_connection = self.connection.connection
+
         es_connection.index({
             'operation': operation,
+            'index_name': u'{}-{}'.format(index_name, datetime.now().strftime("%Y.%m.%d")),
             'alias': index_name,
+            'model': model or '',
+            'settings': index_settings,
             'created_on': datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
             'updated_on': datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
         }, INTERNAL_INDEX, 'indices')
@@ -329,7 +333,7 @@ class DatabaseOperations(NonrelDatabaseOperations):
                                                 pprint.PrettyPrinter(indent=4).pformat(result)))
 
             # register index operation
-            self.register_index_operation(INTERNAL_INDEX, OPERATION_CREATE_INDEX)
+            self.register_index_operation(INTERNAL_INDEX, OPERATION_CREATE_INDEX, options)
             # register mapping update
             self.register_mapping_update(INTERNAL_INDEX, mapping_indices)
             self.register_mapping_update(INTERNAL_INDEX, mapping_migration)
