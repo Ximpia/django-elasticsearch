@@ -66,7 +66,9 @@ class Command(BaseCommand):
                     for model_index in model._meta.indices:
                         model_index_name = model_index.keys()[0]
                         index_name = u'{}__{}'.format(model._meta.db_table, model_index_name)
-                        index_data = model_index[index_name]
+                        logger.debug(u'model index name: {}'.format(index_name))
+                        index_data = model_index[model_index_name]
+                        logger.debug(u'index_data: {}'.format(index_data))
                         try:
                             index_physical, alias = connection.ops.create_index(index_name,
                                                                                 get_settings_by_meta(index_data))

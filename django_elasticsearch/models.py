@@ -60,7 +60,3 @@ class BaseModel(models.Model):
                 },
             }
         ]
-
-
-class ExampleModel(models.Model):
-    name = models.CharField(max_length=50)
