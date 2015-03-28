@@ -96,15 +96,7 @@ class DatabaseOperations(NonrelDatabaseOperations):
         if has_alias:
             es_connection.indices.add_alias(alias, index_name)
         if not skip_register:
-            # save index creation data
-            es_connection.index({
-                'operation': OPERATION_CREATE_INDEX,
-                'index_name': index_name,
-                'alias': alias,
-                'settings': index_settings,
-                'created_on': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                'updated_on': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            }, INTERNAL_INDEX, 'indices')
+            self.register_index_operation(index_name, OPERATION_CREATE_INDEX, index_settings)
         if has_alias:
             logger.info(u'index "{}" aliased "{}" created'.format(index_name, alias))
         else:
