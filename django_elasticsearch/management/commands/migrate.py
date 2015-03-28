@@ -42,10 +42,11 @@ class Command(BaseCommand):
                 # register create index for global
                 connection.ops.register_index_operation(global_index_name, OPERATION_CREATE_INDEX,
                                                         connection.ops.build_es_settings_from_django(options))
-            except (IndexAlreadyExistsException, ElasticSearchException):
-                """import traceback
-                logger.error(traceback.format_exc())"""
-                self.stderr.write(u'Could not create index, already exists')
+            except IndexAlreadyExistsException:
+                pass
+            except ElasticSearchException:
+                import traceback
+                logger.error(traceback.format_exc())
 
             logger.debug(u'models: {}'.format(connection.introspection.models))
             for app_name, app_models in connection.introspection.models.iteritems():
@@ -62,7 +63,7 @@ class Command(BaseCommand):
                         # mapping.save()
                     if not hasattr(model._meta, 'indices'):
                         continue
-                    """for model_index in model._meta.indices:
+                    for model_index in model._meta.indices:
                         model_index_name = model_index.keys()[0]
                         index_name = u'{}__{}'.format(model._meta.db_table, model_index_name)
                         index_data = model_index[index_name]
@@ -91,4 +92,4 @@ class Command(BaseCommand):
                             self.stdout.write(u'Could not update mapping, rebuilding index "{}" ...'
                                               .format(index_name))
                             connection.ops.rebuild_index(index_name)
-                            mapping.save()"""
+                            mapping.save()
