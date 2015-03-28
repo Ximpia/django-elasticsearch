@@ -184,6 +184,9 @@ class DatabaseOperations(NonrelDatabaseOperations):
             'created_on': datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
             'updated_on': datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
         }, INTERNAL_INDEX, 'mapping_migration')
+        logger.info(u'register_mapping_update :: index: {}'.format(
+            index_name,
+        ))
 
     def rebuild_index(self, alias):
         """
