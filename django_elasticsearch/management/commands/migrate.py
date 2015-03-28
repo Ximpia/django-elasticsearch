@@ -75,21 +75,19 @@ class Command(BaseCommand):
                         except IndexAlreadyExistsException:
                             pass
                         # build mapping based on index_data
-                        if 'routing_field' in index_data:
+                        """if 'routing_field' in index_data:
                             mapping = model_to_mapping(model, es_connection, index_name, _routing={
                                 'required': True,
                                 'path': index_data['routing_field']
                             })
-                        else:
-                            mapping = model_to_mapping(model, es_connection, index_name)
-                        self.stdout.write(u'Creating mappings for {}'.format(model))
-                        logger.debug(u'creating mapping: {}'.format(
-                            pprint.PrettyPrinter(indent=4).pformat(mapping.as_dict())))
+                        else:"""
+                        mapping = model_to_mapping(model, es_connection, index_name)
                         try:
                             mapping.save()
-                            self.stdout.write(u'Mappings updated')
+                            self.stdout.write(u'Mapping for model {}.{} updated'
+                                              .format(app_name, index_name))
                         except Exception as e:
-                            self.stdout.write(u'Could not update mapping, rebuilding index "{}" ...'
+                            self.stderr.write(u'Could not update mapping, rebuilding index "{}" ...'
                                               .format(index_name))
-                            connection.ops.rebuild_index(index_name)
-                            mapping.save()
+                            # connection.ops.rebuild_index(index_name)
+                            # mapping.save()
