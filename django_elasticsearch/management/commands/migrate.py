@@ -13,7 +13,7 @@ from pyes.exceptions import IndexAlreadyExistsException, ElasticSearchException
 # django_elasticsearch
 from django_elasticsearch.mapping import model_to_mapping
 from django_elasticsearch.models import get_settings_by_meta
-from django_elasticsearch import ENGINE, INTERNAL_INDEX
+from django_elasticsearch import ENGINE, INTERNAL_INDEX, OPERATION_CREATE_INDEX, OPERATION_UPDATE_MAPPING
 
 __author__ = 'jorgealegre'
 
@@ -33,18 +33,19 @@ class Command(BaseCommand):
         if engine != ENGINE:
             return super(Command, self).handle(**options)
         else:
-
             # project global index
             try:
                 index_name_final, alias = connection.ops.create_index(global_index_name, options,
                                                                       skip_register=True)
                 self.stdout.write(u'index "{}" created with physical name "{}"'.format(alias, index_name_final))
+                connection.ops.build_django_engine_structure()
+                # register create index for global
+                connection.ops.register_index_operation(global_index_name, OPERATION_CREATE_INDEX,
+                                                        connection.ops.build_es_settings_from_django(options))
             except (IndexAlreadyExistsException, ElasticSearchException):
-                print 'problem db project!!!!!'
+                self.stderr.write(u'Could not create index, already exists')
                 pass
 
-            connection.ops.build_django_engine_structure()
-            # register create index for global
             import sys
             sys.exit(1)
 
@@ -64,7 +65,7 @@ class Command(BaseCommand):
                         pprint.PrettyPrinter(indent=4).pformat(mapping.as_dict())))
                     if not hasattr(model._meta, 'indices'):
                         continue
-                    for model_index in model._meta.indices:
+                    """for model_index in model._meta.indices:
                         model_index_name = model_index.keys()[0]
                         index_name = u'{}__{}'.format(model._meta.db_table, model_index_name)
                         index_data = model_index[index_name]
@@ -93,4 +94,4 @@ class Command(BaseCommand):
                             self.stdout.write(u'Could not update mapping, rebuilding index "{}" ...'
                                               .format(index_name))
                             connection.ops.rebuild_index(index_name)
-                            mapping.save()
+                            mapping.save()"""

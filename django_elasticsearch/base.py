@@ -184,8 +184,9 @@ class DatabaseOperations(NonrelDatabaseOperations):
             'created_on': datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
             'updated_on': datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
         }, INTERNAL_INDEX, 'mapping_migration')
-        logger.info(u'register_mapping_update :: index: {}'.format(
+        logger.info(u'register_mapping_update :: index: {} doc_type: {}'.format(
             index_name,
+            mapping.name,
         ))
 
     def rebuild_index(self, alias):
@@ -255,6 +256,22 @@ class DatabaseOperations(NonrelDatabaseOperations):
         ])
         # 4. delete old index
         self.delete_index(index_name_physical)
+
+    def build_es_settings_from_django(self, options):
+        """
+        Build ElasticSearch settings from django options in DATABASES setting
+
+        :param options:
+        :return:
+        """
+        es_settings = {}
+        es_settings.update({
+            'number_of_replicas': options.get('NUMBER_OF_REPLICAS', 1),
+            'number_of_shards': options.get('NUMBER_OF_SHARDS', 5),
+        })
+        if 'ANALYSIS' in options and options['analysis'].keys():
+            es_settings['analysis'] = options.get('ANALYSIS', '')
+        return es_settings
 
     def build_django_engine_structure(self):
         """
