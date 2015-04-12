@@ -59,8 +59,8 @@ class Command(BaseCommand):
                         import traceback
                         logger.error(traceback.format_exc())
                         self.stderr.write(u'Could not update mapping, rebuilding global index...')
-                        # connection.ops.rebuild_index(global_index_name)
-                        # mapping.save()
+                        connection.ops.rebuild_index(global_index_name)
+                        mapping.save()
                     if not hasattr(model._meta, 'indices'):
                         continue
                     for model_index in model._meta.indices:
@@ -91,5 +91,5 @@ class Command(BaseCommand):
                         except Exception as e:
                             self.stderr.write(u'Could not update mapping, rebuilding index "{}" ...'
                                               .format(index_name))
-                            # connection.ops.rebuild_index(index_name)
-                            # mapping.save()
+                            connection.ops.rebuild_index(index_name)
+                            mapping.save()
