@@ -1,6 +1,5 @@
 # python
 import logging
-import pprint
 
 # django
 from django.conf import settings
@@ -13,7 +12,7 @@ from pyes.exceptions import IndexAlreadyExistsException, ElasticSearchException
 # django_elasticsearch
 from django_elasticsearch.mapping import model_to_mapping
 from django_elasticsearch.models import get_settings_by_meta
-from django_elasticsearch import ENGINE, INTERNAL_INDEX, OPERATION_CREATE_INDEX, OPERATION_UPDATE_MAPPING
+from django_elasticsearch import ENGINE, OPERATION_CREATE_INDEX
 
 __author__ = 'jorgealegre'
 
