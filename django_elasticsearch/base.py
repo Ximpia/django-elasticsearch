@@ -345,32 +345,11 @@ class DatabaseOperations(NonrelDatabaseOperations):
                                                        indices=INTERNAL_INDEX)
             logger.info(u'{} result: {}'.format('.django_engine/mapping_migration',
                                                 pprint.PrettyPrinter(indent=4).pformat(result)))
-            # model
-            mapping_model = DocumentObjectField(
-                name='model',
-                connection=self.connection,
-                index_name=INTERNAL_INDEX,
-                properties={
-                    'index_name': StringField(index='not_analyzed'),
-                    'alias': StringField(index='not_analyzed'),
-                    'model': StringField(index='not_analyzed'),
-                    'mapping': StringField(index='not_analyzed'),
-                    'settings': ObjectField(),
-                    'created_on': DateField(),
-                    'updated_on': DateField(),
-                })
-            result = es_connection.indices.put_mapping(doc_type='model',
-                                                       mapping=mapping_model,
-                                                       indices=INTERNAL_INDEX)
-            logger.info(u'{} result: {}'.format('.django_engine/model',
-                                                pprint.PrettyPrinter(indent=4).pformat(result)))
-
             # register index operation
             self.register_index_operation(INTERNAL_INDEX, OPERATION_CREATE_INDEX, options)
             # register mapping update
             self.register_mapping_update(INTERNAL_INDEX, mapping_indices)
             self.register_mapping_update(INTERNAL_INDEX, mapping_migration)
-            self.register_mapping_update(INTERNAL_INDEX, mapping_model)
         except (IndexAlreadyExistsException, ElasticSearchException):
             traceback.print_exc()
             logger.info(u'Could not create index')
@@ -441,11 +420,10 @@ class DatabaseIntrospection(NonrelDatabaseIntrospection):
         and are present in settings.INSTALLED_APPS.
         """
 
-        """all_models = list(chain.from_iterable(self.cql_models.values()))
+        all_models = list(chain.from_iterable(self.cql_models.values()))
         tables = [model.column_family_name(include_keyspace=False)
-                  for model in all_models]"""
-
-        return []
+                  for model in all_models]
+        return tables
 
     def table_names(self, cursor=None):
         """
