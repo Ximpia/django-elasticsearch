@@ -75,13 +75,6 @@ class Command(BaseCommand):
                                                                                                    index_physical))
                         except IndexAlreadyExistsException:
                             pass
-                        # build mapping based on index_data
-                        """if 'routing_field' in index_data:
-                            mapping = model_to_mapping(model, es_connection, index_name, _routing={
-                                'required': True,
-                                'path': index_data['routing_field']
-                            })
-                        else:"""
                         mapping = model_to_mapping(model, es_connection, index_name)
                         try:
                             mapping.save()
