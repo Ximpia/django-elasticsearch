@@ -105,49 +105,63 @@ class PositiveSmallIntegerFieldMapping(FieldMapping):
 
     @classmethod
     def get(cls, field, **kwargs):
-        pass
+        """
+        Generate mapping for PositiveSmallInteger
+
+        :param field:
+        :param kwargs:
+        :return:
+        """
+        return mappings.IntegerField(name=field.name,
+                                     **kwargs)
 
 
 class SmallIntegerFieldMapping(FieldMapping):
 
     @classmethod
     def get(cls, field, **kwargs):
-        pass
+        return mappings.IntegerField(name=field.name,
+                                     **kwargs)
 
 
 class PositiveIntegerFieldMapping(FieldMapping):
 
     @classmethod
     def get(cls, field, **kwargs):
-        pass
+        return mappings.IntegerField(name=field.name,
+                                     **kwargs)
 
 
 class PositionFieldMapping(FieldMapping):
 
     @classmethod
     def get(cls, field, **kwargs):
-        pass
+        return mappings.GeoPointField(name=field.name,
+                                      **kwargs)
 
 
 class FloatFieldMapping(FieldMapping):
 
     @classmethod
-    def get(cls, field):
-        pass
+    def get(cls, field, **kwargs):
+        return mappings.FloatField(name=field.name,
+                                   **kwargs)
 
 
 class DecimalFieldMapping(FieldMapping):
 
     @classmethod
     def get(cls, field, **kwargs):
-        pass
+        return mappings.DoubleField(name=field.name,
+                                    **kwargs)
 
 
 class BooleanFieldMapping(FieldMapping):
 
     @classmethod
     def get(cls, field, **kwargs):
-        pass
+        return mappings.BooleanField(name=field.name,
+                                     **kwargs)
 
 
 class NullBooleanFieldMapping(FieldMapping):
@@ -227,7 +241,8 @@ class DictFieldMapping(FieldMapping):
         :param field:
         :return:
         """
-        pass
+        return mappings.ObjectField(name=field.name,
+                                    **kwargs)
 
 
 class SetFieldMapping(FieldMapping):
@@ -239,7 +254,8 @@ class SetFieldMapping(FieldMapping):
         :param field:
         :return:
         """
-        pass
+        return mappings.ObjectField(name=field.name,
+                                    **kwargs)
 
 
 class ListFieldMapping(FieldMapping):
@@ -251,4 +267,5 @@ class ListFieldMapping(FieldMapping):
         :param field:
         :return:
         """
-        pass
+        return mappings.ObjectField(name=field.name,
+                                    **kwargs)
