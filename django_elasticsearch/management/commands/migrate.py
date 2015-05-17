@@ -41,7 +41,7 @@ class Command(BaseCommand):
                     self.stdout.write(u'index "{}" created with physical name "{}"'.format(alias, index_name_final))
                     connection.ops.build_django_engine_structure()
                     # register create index for global
-                    connection.ops.register_index_operation(global_index_name, OPERATION_CREATE_INDEX,
+                    connection.ops.register_index_operation(index_name_final, OPERATION_CREATE_INDEX,
                                                             connection.ops.build_es_settings_from_django(options))
                 except IndexAlreadyExistsException:
                     pass

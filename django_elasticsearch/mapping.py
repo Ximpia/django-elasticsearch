@@ -48,6 +48,10 @@ def model_to_mapping(model, connection, index_name, **kwargs):
             mapping.add_property(field)
         else:
             raise DjangoElasticEngineException(_(u'Field type {} not supported'.format(field_type)))
+    logger.info(u'model_to_mapping :: model: {} index_name: {}'.format(
+        model._meta.db_table,
+        index_name
+    ))
     return mapping
 
 

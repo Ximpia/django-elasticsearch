@@ -82,8 +82,13 @@ class DatabaseOperations(NonrelDatabaseOperations):
         :raises IndexAlreadyExistsException when can't create index.
         """
         # "logstash-%{+YYYY.MM.dd}"
+        import random
         alias = index_name if has_alias is True else None
-        index_name = u'{}-{}'.format(index_name, datetime.now().strftime("%Y.%m.%d"))
+        index_name = u'{}-{}_{}'.format(
+            index_name,
+            datetime.now().strftime("%Y.%m.%d"),
+            random.randint(1, 999)
+        )
         es_connection = self.connection.connection
         if index_settings is None and options is not None:
             index_settings = {
@@ -150,7 +155,7 @@ class DatabaseOperations(NonrelDatabaseOperations):
 
         es_connection.index({
             'operation': operation,
-            'index_name': u'{}-{}'.format(index_name, datetime.now().strftime("%Y.%m.%d")),
+            'index_name': index_name,
             'alias': index_name,
             'model': model or '',
             'settings': index_settings,
@@ -231,10 +236,9 @@ class DatabaseOperations(NonrelDatabaseOperations):
         """
         es_connection = self.connection.connection
         options = settings.DATABASES.get(DEFAULT_DB_ALIAS, {}).get('OPTIONS', {})
-        alias_physical = u'{}_alt'.format(alias)
         # 1. create alt index
         logger.debug(u'rebuild_index :: alias: {}'.format(alias))
-        index_data = self.create_index(alias_physical, options, has_alias=False)
+        index_data = self.create_index(alias, options, has_alias=False)
         index_name_physical = index_data[0]
         # 2. Inspect all models: create mappings for alt index: mapping.save()
         if alias in settings.DATABASES:
