@@ -1,8 +1,5 @@
 # python
 import logging
-import pprint
-import json
-from datetime import datetime
 
 # django
 from collections import OrderedDict
@@ -10,14 +7,8 @@ from django.db import connections, DEFAULT_DB_ALIAS
 
 # pyes
 from pyes import mappings
-from pyes.query import QueryStringQuery, Search
 from pyes.mappings import get_field
 from pyes.models import DotDict, SortedDict
-
-# django_elasticsearch
-from django_elasticsearch import INTERNAL_INDEX
-
-from django.db import models
 
 __author__ = 'jorgealegre'
 
@@ -61,17 +52,47 @@ class BooleanField(mappings.BooleanField):
     def __init__(self, *args, **kwargs):
         super(BooleanField, self).__init__(*args, **kwargs)
 
+    def as_dict(self):
+        map_ = super(BooleanField, self).as_dict()
+        if self.index is False and self.tokenize is False:
+            map_['index'] = 'no'
+        elif self.index is True and self.tokenize is False:
+            map_['index'] = 'not_analyzed'
+        elif self.index is True and self.tokenize is True:
+            map_['index'] = 'analyzed'
+        return map_
+
 
 class DoubleField(mappings.DoubleField):
 
     def __init__(self, *args, **kwargs):
         super(DoubleField, self).__init__(*args, **kwargs)
 
+    def as_dict(self):
+        map_ = super(DoubleField, self).as_dict()
+        if self.index is False and self.tokenize is False:
+            map_['index'] = 'no'
+        elif self.index is True and self.tokenize is False:
+            map_['index'] = 'not_analyzed'
+        elif self.index is True and self.tokenize is True:
+            map_['index'] = 'analyzed'
+        return map_
+
 
 class FloatField(mappings.FloatField):
 
     def __init__(self, *args, **kwargs):
         super(FloatField, self).__init__(*args, **kwargs)
+
+    def as_dict(self):
+        map_ = super(FloatField, self).as_dict()
+        if self.index is False and self.tokenize is False:
+            map_['index'] = 'no'
+        elif self.index is True and self.tokenize is False:
+            map_['index'] = 'not_analyzed'
+        elif self.index is True and self.tokenize is True:
+            map_['index'] = 'analyzed'
+        return map_
 
 
 class IntegerField(mappings.IntegerField):
@@ -95,11 +116,31 @@ class LongField(mappings.LongField):
     def __init__(self, *args, **kwargs):
         super(LongField, self).__init__(*args, **kwargs)
 
+    def as_dict(self):
+        map_ = super(LongField, self).as_dict()
+        if self.index is False and self.tokenize is False:
+            map_['index'] = 'no'
+        elif self.index is True and self.tokenize is False:
+            map_['index'] = 'not_analyzed'
+        elif self.index is True and self.tokenize is True:
+            map_['index'] = 'analyzed'
+        return map_
+
 
 class MultiField(mappings.MultiField):
 
     def __init__(self, *args, **kwargs):
         super(MultiField, self).__init__(*args, **kwargs)
+
+    def as_dict(self):
+        map_ = super(MultiField, self).as_dict()
+        if self.index is False and self.tokenize is False:
+            map_['index'] = 'no'
+        elif self.index is True and self.tokenize is False:
+            map_['index'] = 'not_analyzed'
+        elif self.index is True and self.tokenize is True:
+            map_['index'] = 'analyzed'
+        return map_
 
 
 class NestedObject(mappings.NestedObject):
@@ -107,11 +148,31 @@ class NestedObject(mappings.NestedObject):
     def __init__(self, *args, **kwargs):
         super(NestedObject, self).__init__(*args, **kwargs)
 
+    def as_dict(self):
+        map_ = super(NestedObject, self).as_dict()
+        if self.index is False and self.tokenize is False:
+            map_['index'] = 'no'
+        elif self.index is True and self.tokenize is False:
+            map_['index'] = 'not_analyzed'
+        elif self.index is True and self.tokenize is True:
+            map_['index'] = 'analyzed'
+        return map_
+
 
 class ShortField(mappings.ShortField):
 
     def __init__(self, *args, **kwargs):
         super(ShortField, self).__init__(*args, **kwargs)
+
+    def as_dict(self):
+        map_ = super(ShortField, self).as_dict()
+        if self.index is False and self.tokenize is False:
+            map_['index'] = 'no'
+        elif self.index is True and self.tokenize is False:
+            map_['index'] = 'not_analyzed'
+        elif self.index is True and self.tokenize is True:
+            map_['index'] = 'analyzed'
+        return map_
 
 
 class ObjectField(mappings.ObjectField):
