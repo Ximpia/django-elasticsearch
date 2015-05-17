@@ -209,7 +209,7 @@ class DatabaseOperations(NonrelDatabaseOperations):
         1. Rebuild global index: Rebuilds whole database with all models
         2. Model rebuild: Rebuilds only model main store data and associated indexes
 
-        :param index_name: Index name
+        :param alias: Index alias
 
         :return:
         """
@@ -227,17 +227,15 @@ class DatabaseOperations(NonrelDatabaseOperations):
                     mapping.save()
         else:
             # get model by index
-            query = '(alias:({alias}))'.format(alias)
-            results = es_connection.search(Search(QueryStringQuery(query)),
-                                           indices=INTERNAL_INDEX,
-                                           doc_types='model')
-            if results and len(results) == 1:
-                model = results[0].model
-                mapping = model_to_mapping(model, es_connection, index_name_physical)
-                mapping.save()
-            else:
-                # raise exception RebuildIndexException
-                raise exceptions.RebuildIndexException(_(u'No model data found in {}'.format(INTERNAL_INDEX)))
+            # {model}__{model_index_name}
+            if '__' not in alias:
+                raise exceptions.RebuildIndexException(_(u'Invalid model index format "{}"'.format(alias)))
+            alias_fields = alias.split('__')
+            for app_name, app_models in self.connection.introspection.models.iteritems():
+                for model in app_models:
+                    if model._meta.db_table == alias_fields[0]:
+                        mapping = model_to_mapping(alias_fields[0], es_connection, index_name_physical)
+                        mapping.save()
         # 2. export/import data to new index
         # bulk operations
         results = es_connection.search(Search(QueryStringQuery('*:*')),
@@ -257,8 +255,8 @@ class DatabaseOperations(NonrelDatabaseOperations):
                             meta['type'],
                             meta['id'])
                 content += json.dumps(result) + '\n'
+                # make bulk add to new index "index_name_physical"
                 bulk.add(content)
-            # make bulk add to new index "index_name_physical"
             results = es_connection.search_scroll(scroll_id, scroll=self.SCROLL_TIME)
         bulk.flush_bulk()
         # 3. assign alias to new index
