@@ -103,6 +103,22 @@ class DatabaseOperations(NonrelDatabaseOperations):
             logger.info(u'index "{}" created'.format(index_name))
         return index_name, alias
 
+    def has_alias(self, alias):
+        """
+        Check if alias exists
+
+        :param alias:
+        :return:
+        """
+        es_connection = self.connection.connection
+        try:
+            indices = es_connection.indices.get_alias(alias)
+        except IndexMissingException:
+            return False
+        if indices:
+            return True
+        return False
+
     def delete_index(self, index_name, skip_register=False):
         """
         Deletes index
@@ -215,8 +231,10 @@ class DatabaseOperations(NonrelDatabaseOperations):
         """
         es_connection = self.connection.connection
         options = settings.DATABASES.get(DEFAULT_DB_ALIAS, {}).get('OPTIONS', {})
+        alias_physical = u'{}_alt'.format(alias)
         # 1. create alt index
-        index_data = self.create_index(alias, options, has_alias=False)
+        logger.debug(u'rebuild_index :: alias: {}'.format(alias))
+        index_data = self.create_index(alias_physical, options, has_alias=False)
         index_name_physical = index_data[0]
         # 2. Inspect all models: create mappings for alt index: mapping.save()
         if alias in settings.DATABASES:
@@ -236,6 +254,7 @@ class DatabaseOperations(NonrelDatabaseOperations):
                     if model._meta.db_table == alias_fields[0]:
                         mapping = model_to_mapping(alias_fields[0], es_connection, index_name_physical)
                         mapping.save()
+        logger.debug(u'rebuild_index :: Updated mappings!!')
         # 2. export/import data to new index
         # bulk operations
         results = es_connection.search(Search(QueryStringQuery('*:*')),

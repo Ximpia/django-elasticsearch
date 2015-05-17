@@ -33,25 +33,28 @@ class Command(BaseCommand):
             return super(Command, self).handle(**options)
         else:
             # project global index
-            try:
-                index_name_final, alias = connection.ops.create_index(global_index_name, options,
-                                                                      skip_register=True)
-                self.stdout.write(u'index "{}" created with physical name "{}"'.format(alias, index_name_final))
-                connection.ops.build_django_engine_structure()
-                # register create index for global
-                connection.ops.register_index_operation(global_index_name, OPERATION_CREATE_INDEX,
-                                                        connection.ops.build_es_settings_from_django(options))
-            except IndexAlreadyExistsException:
-                pass
-            except ElasticSearchException:
-                import traceback
-                logger.error(traceback.format_exc())
+            has_alias = connection.ops.has_alias(global_index_name)
+            if not has_alias:
+                try:
+                    index_name_final, alias = connection.ops.create_index(global_index_name, options,
+                                                                          skip_register=True)
+                    self.stdout.write(u'index "{}" created with physical name "{}"'.format(alias, index_name_final))
+                    connection.ops.build_django_engine_structure()
+                    # register create index for global
+                    connection.ops.register_index_operation(global_index_name, OPERATION_CREATE_INDEX,
+                                                            connection.ops.build_es_settings_from_django(options))
+                except IndexAlreadyExistsException:
+                    pass
+                except ElasticSearchException:
+                    import traceback
+                    logger.error(traceback.format_exc())
 
             logger.debug(u'models: {}'.format(connection.introspection.models))
             for app_name, app_models in connection.introspection.models.iteritems():
                 for model in app_models:
                     mapping = model_to_mapping(model, es_connection, global_index_name)
                     try:
+                        a = int('a')
                         mapping.save()
                         self.stdout.write(u'Mapping for model {}.{} updated'.format(app_name, model.__name__))
                     except Exception as e:
