@@ -241,7 +241,7 @@ class DatabaseOperations(NonrelDatabaseOperations):
         index_data = self.create_index(alias, options, has_alias=False)
         index_name_physical = index_data[0]
         # 2. Inspect all models: create mappings for alt index: mapping.save()
-        if alias in settings.DATABASES:
+        if alias in map(lambda x: x['NAME'], settings.DATABASES.values()):
             # global index
             for app_name, app_models in self.connection.introspection.models.iteritems():
                 for model in app_models:
@@ -262,12 +262,13 @@ class DatabaseOperations(NonrelDatabaseOperations):
         # 2. export/import data to new index
         # bulk operations
         results = es_connection.search(Search(QueryStringQuery('*:*')),
-                                       indices=alias,
+                                       indices=es_connection.indices.get_alias(alias),
                                        scroll=self.SCROLL_TIME)
         scroll_id = results.scroller_id
         es_connection.bulk_size = self.ADD_BULK_SIZE
         bulk = es_connection.create_bulker()
         while results:
+            logger.debug(u'rebuild_index :: results: {}'.format(results))
             for result in results:
                 # add to bulk for index
                 # content = json.dumps(result.get_meta()) + '\n'
@@ -285,11 +286,11 @@ class DatabaseOperations(NonrelDatabaseOperations):
         # 3. assign alias to new index
         indices = es_connection.indices.get_alias(alias)
         es_connection.indices.change_aliases([
-            ('remove', indices[0], alias),
-            ('add', index_name_physical, alias),
+            ('remove', indices[0], alias, {}),
+            ('add', index_name_physical, alias, {}),
         ])
         # 4. delete old index
-        self.delete_index(index_name_physical)
+        self.delete_index(indices[0])
 
     def build_es_settings_from_django(self, options):
         """

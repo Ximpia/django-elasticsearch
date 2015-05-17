@@ -54,7 +54,6 @@ class Command(BaseCommand):
                 for model in app_models:
                     mapping = model_to_mapping(model, es_connection, global_index_name)
                     try:
-                        a = int('a')
                         mapping.save()
                         self.stdout.write(u'Mapping for model {}.{} updated'.format(app_name, model.__name__))
                     except Exception as e:
