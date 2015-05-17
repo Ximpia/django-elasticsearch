@@ -487,7 +487,10 @@ class DatabaseWrapper(NonrelDatabaseWrapper):
         del self.connection
 
     def connect(self):
-        logger.debug(u'connect... es_url: {} options: {}'.format(self.es_url, self.settings_dict))
+        import pprint
+        logger.debug(u'connect... es_url: {} options: {}'.format(self.es_url,
+                                                                 pprint.PrettyPrinter(indent=4)
+                                                                 .pformat(self.settings_dict)))
         if not self.connected or self.connection is None:
             self.connection = ES(self.es_url,
                                  default_indices=[self.settings_dict['NAME']],
