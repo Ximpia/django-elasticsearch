@@ -592,21 +592,20 @@ class SQLInsertCompiler(SQLCompiler):
                         }
                     }) + '\n' + json.dumps(field_values) + '\n')
             else:
-                for index_data in filter(lambda x: x[x.keys()[0]]['is_default'] is True, self.opts.indices):
-                    index_conf = {
-                        u'create': {
-                            u'_index': index_data.keys()[0],
-                            u'_type': self.opts.db_table,
-                            u'_id': self._get_pk(field_values),
-                        }
+                index_data = self.opts.indices[0]
+                index_conf = {
+                    u'create': {
+                        u'_index': index_data.keys()[0],
+                        u'_type': self.opts.db_table,
+                        u'_id': self._get_pk(field_values),
                     }
-                    if 'routing' in index_data:
-                        index_conf.update({
-                            u'_routing': index_data['routing']
-                        })
-                    self.connection.bulker.add(json.dumps(index_conf) + '\n' + json.dumps(field_values) + '\n')
-            for index_data in filter(lambda x: 'is_default' not in x[x.keys()[0]] or
-                                     x[x.keys()[0]]['is_default'] is False, self.opts.indices):
+                }
+                if 'routing' in index_data:
+                    index_conf.update({
+                        u'_routing': index_data['routing']
+                    })
+                self.connection.bulker.add(json.dumps(index_conf) + '\n' + json.dumps(field_values) + '\n')
+            for index_data in self.opts.indices[1:]:
                 index_conf = {
                     u'index': {
                         u'_index': index_data.keys()[0],
