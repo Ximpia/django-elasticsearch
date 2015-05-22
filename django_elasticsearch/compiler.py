@@ -569,16 +569,20 @@ class SQLInsertCompiler(SQLCompiler):
         for obj in self.query.objs:
             field_values = {}
             for field in self.query.fields:
-                # single relationships would return id in get_db_prep_save method
-                #  many relationships would return list of ids
-                value = field.get_db_prep_save(
-                    getattr(obj, field.attname) if self.query.raw else field.pre_save(obj, obj._state.adding),
-                    connection=self.connection
-                )
-                if value is None and not field.null and not field.primary_key:
-                    raise IntegrityError(u"You can't set {} (a non-nullable field) to None!".format(field.name))
-                # Prepare value for database, note that query.values have
-                # already passed through get_db_prep_save.
+                field, field_kind, db_type = self.ops.convert_as(field)
+                # check field_kind if is related field or many to many
+                if field_kind in ['ForeignKey', 'GenericRelation', 'GenericForeignKey']:
+                    # we need the model associated with field
+                    # value = self.ops.to_dict(field.rel.to)
+                    value = {}
+                else:
+                    value = field.get_db_prep_save(
+                        getattr(obj, field.attname) if self.query.raw else field.pre_save(obj, obj._state.adding),
+                        connection=self.connection
+                    )
+                    if value is None and not field.null and not field.primary_key:
+                        raise IntegrityError(u"You can't set {} (a non-nullable field) to None!".format(field.name))
+
                 value = self.ops.value_for_db(value, field)
                 field_values[field.column] = value
             if hasattr(self.opts, 'disable_default_index') and self.opts.disable_default_index is False:

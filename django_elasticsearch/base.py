@@ -5,6 +5,7 @@ import traceback
 import pprint
 from datetime import datetime
 import json
+import pickle
 
 # django
 from django.db.backends import connection_created
@@ -12,6 +13,10 @@ from django.db import connections, router, transaction, models as dj_models, DEF
 from django.utils.datastructures import SortedDict
 from django.conf import settings
 from django.utils.translation import ugettext as _
+from django.utils.functional import Promise
+from django.utils.safestring import EscapeString, EscapeUnicode, SafeString, \
+    SafeUnicode
+from django.db.models.fields.related import ManyToManyField
 
 
 # djangotoolbox
@@ -56,10 +61,207 @@ class DatabaseOperations(NonrelDatabaseOperations):
     SCROLL_TIME = '10m'
     ADD_BULK_SIZE = 1000
 
+    def value_for_db(self, value, field, lookup=None):
+        """
+        Does type-conversions needed before storing a value in the
+        the database or using it as a filter parameter.
+
+        This is a convience wrapper that only precomputes field's kind
+        and a db_type for the field (or the primary key of the related
+        model for ForeignKeys etc.) and knows that arguments to the
+        `isnull` lookup (`True` or `False`) should not be converted,
+        while some other lookups take a list of arguments.
+        In the end, it calls `_value_for_db` to do the real work; you
+        should typically extend that method, but only call this one.
+
+        :param value: A value to be passed to the database driver
+        :param field: A field the value comes from
+        :param lookup: None if the value is being prepared for storage;
+                       lookup type name, when its going to be used as a
+                       filter argument
+        """
+        field, field_kind, db_type = self._convert_as(field, lookup)
+
+        # Argument to the "isnull" lookup is just a boolean, while some
+        # other lookups take a list of values.
+        if lookup == 'isnull':
+            return value
+        elif lookup in ('in', 'range', 'year'):
+            return [self._value_for_db(subvalue, field,
+                                       field_kind, db_type, lookup)
+                    for subvalue in value]
+        else:
+            return self._value_for_db(value, field,
+                                      field_kind, db_type, lookup)
+
+    def _value_for_db(self, value, field, field_kind, db_type, lookup):
+        """
+        Converts a standard Python value to a type that can be stored
+        or processed by the database driver.
+
+        This implementation only converts elements of iterables passed
+        by collection fields, evaluates Django's lazy objects and
+        marked strings and handles embedded models.
+        Currently, we assume that dict keys and column, model, module
+        names (strings) of embedded models require no conversion.
+
+        We need to know the field for two reasons:
+        -- to allow back-ends having separate key spaces for different
+           tables to create keys refering to the right table (which can
+           be the field model's table or the table of the model of the
+           instance a ForeignKey or other relation field points to).
+        -- to know the field of values passed by typed collection
+           fields and to use the proper fields when deconverting values
+           stored for typed embedding field.
+        Avoid using the field in any other way than by inspecting its
+        properties, it may not hold any value or hold a value other
+        than the one you're asked to convert.
+
+        You may want to call this method before doing other back-end
+        specific conversions.
+
+        :param value: A value to be passed to the database driver
+        :param field: A field having the same properties as the field
+                      the value comes from; instead of related fields
+                      you'll get the related model primary key, as the
+                      value usually needs to be converted using its
+                      properties
+        :param field_kind: Equal to field.get_internal_type()
+        :param db_type: Same as creation.db_type(field)
+        :param lookup: None if the value is being prepared for storage;
+                       lookup type name, when its going to be used as a
+                       filter argument
+        """
+        # Back-ends may want to store empty lists or dicts as None.
+        if value is None:
+            return None
+
+        # Force evaluation of lazy objects (e.g. lazy translation
+        # strings).
+        # Some back-ends pass values directly to the database driver,
+        # which may fail if it relies on type inspection and gets a
+        # functional proxy.
+        # This code relies on unicode cast in django.utils.functional
+        # just evaluating the wrapped function and doing nothing more.
+        # TODO: This has been partially fixed in vanilla with:
+        #       https://code.djangoproject.com/changeset/17698, however
+        #       still fails for proxies in lookups; reconsider in 1.4.
+        #       Also research cases of database operations not done
+        #       through the sql.Query.
+        if isinstance(value, Promise):
+            value = unicode(value)
+
+        # Django wraps strings marked as safe or needed escaping,
+        # convert them to just strings for type-inspecting back-ends.
+        if isinstance(value, (SafeString, EscapeString)):
+            value = str(value)
+        elif isinstance(value, (SafeUnicode, EscapeUnicode)):
+            value = unicode(value)
+
+        # Convert elements of collection fields.
+        # We would need to test set and list collections. DictField should do OK with ObjectField
+        if field_kind in ('ListField', 'SetField', 'DictField',):
+            value = self._value_for_db_collection(value, field,
+                                                  field_kind, db_type, lookup)
+        return value
+
+    def to_dict(self, instance):
+        opts = instance._meta
+        data = {}
+        for f in opts.concrete_fields + opts.many_to_many:
+            if isinstance(f, ManyToManyField):
+                if instance.pk is None:
+                    data[f.name] = []
+                else:
+                    data[f.name] = list(f.value_from_object(instance).values_list('pk', flat=True))
+            else:
+                data[f.name] = f.value_from_object(instance)
+        return data
+
+    def _value_for_db_model(self, value, field, field_kind, db_type, lookup):
+        """
+        Converts a field => value mapping received from an
+        EmbeddedModelField the format chosen for the field storage.
+
+        The embedded instance fields' values are also converted /
+        deconverted using value_for/from_db, so any back-end
+        conversions will be applied.
+
+        Returns (field.column, value) pairs, possibly augmented with
+        model info (to be able to deconvert the embedded instance for
+        untyped fields) encoded according to the db_type chosen.
+        If "dict" db_type is given a Python dict is returned.
+        If "list db_type is chosen a list with columns and values
+        interleaved will be returned. Note that just a single level of
+        the list is flattened, so it still may be nested -- when the
+        embedded instance holds other embedded models or collections).
+        Using "bytes" or "string" pickles the mapping using pickle
+        protocol 0 or 2 respectively.
+        If an unknown db_type is used a generator yielding (column,
+        value) pairs with values converted will be returned.
+
+        TODO: How should EmbeddedModelField lookups work?
+        """
+        # value would by id or list of ids for many relationships
+        if lookup:
+            # raise NotImplementedError("Needs specification.")
+            return value
+
+        # Convert using proper instance field's info, change keys from
+        # fields to columns.
+        # TODO/XXX: Arguments order due to Python 2.5 compatibility.
+        value = (
+            (subfield.column, self._value_for_db(
+                subvalue, lookup=lookup, *self._convert_as(subfield, lookup)))
+            for subfield, subvalue in value.iteritems())
+
+        # Cast to a dict, interleave columns with values on a list,
+        # serialize, or return a generator.
+        if db_type == 'dict':
+            value = dict(value)
+        elif db_type == 'list':
+            value = list(item for pair in value for item in pair)
+        elif db_type == 'bytes':
+            value = pickle.dumps(dict(value), protocol=2)
+        elif db_type == 'string':
+            value = pickle.dumps(dict(value))
+
+        return value
+
     def sql_flush(self, style, tables, sequences, allow_cascade=False):
         for table in tables:
             self.connection.indices.delete_mapping(self.connection.db_name, table)
         return []
+
+    def _convert_as(self, field, lookup=None):
+        """
+        Computes parameters that should be used for preparing the field
+        for the database or deconverting a database value for it.
+        """
+        # We need to compute db_type using the original field to allow
+        # GAE to use different storage for primary and foreign keys.
+        db_type = self.connection.creation.db_type(field)
+
+        if field.rel is not None:
+            field = field.rel.get_related_field()
+        field_kind = field.get_internal_type()
+
+        # Values for standard month / day queries are integers.
+        if (field_kind in ('DateField', 'DateTimeField') and
+                lookup in ('month', 'day')):
+            db_type = 'integer'
+
+        return field, field_kind, db_type
+
+    def convert_as(self, field, lookup=None):
+        """
+        Get field data
+
+        :param field:
+        :param lookup:
+        :return:
+        """
+        return self._convert_as(field, lookup)
 
     def check_aggregate_support(self, aggregate):
         """
