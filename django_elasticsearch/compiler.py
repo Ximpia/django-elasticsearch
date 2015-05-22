@@ -54,6 +54,8 @@ else:
 
 __author__ = 'jorgealegre'
 
+logger = logging.getLogger(__name__)
+
 
 class DBQuery(NonrelQuery):
 
@@ -583,11 +585,18 @@ class SQLInsertCompiler(SQLCompiler):
                     if value is None and not field.null and not field.primary_key:
                         raise IntegrityError(u"You can't set {} (a non-nullable field) to None!".format(field.name))
 
+                logger.debug(u'SQLInsertCompiler.execute_sql :: before value_for_db :: field: {} '
+                             u'value: {}'.format(field, value))
                 value = self.ops.value_for_db(value, field)
+                logger.debug(u'SQLInsertCompiler.execute_sql :: after value_for_db :: value: {}'.format(value))
                 field_values[field.column] = value
             if hasattr(self.opts, 'disable_default_index') and self.opts.disable_default_index is False:
+                logger.debug(u'SQLInsertCompiler.execute_sql :: default index')
                 default_indices = self.connection.default_indices
                 for index in default_indices:
+                    logger.debug(u'SQLInsertCompiler.execute_sql :: default index index: {}'.format(
+                        index
+                    ))
                     self.connection.bulker.add(json.dumps({
                         u'create': {
                             u'_index': index,
@@ -596,6 +605,7 @@ class SQLInsertCompiler(SQLCompiler):
                         }
                     }) + '\n' + json.dumps(field_values) + '\n')
             else:
+                logger.debug(u'SQLInsertCompiler.execute_sql :: disable default index')
                 index_data = self.opts.indices[0]
                 index_conf = {
                     u'create': {
@@ -610,6 +620,7 @@ class SQLInsertCompiler(SQLCompiler):
                     })
                 self.connection.bulker.add(json.dumps(index_conf) + '\n' + json.dumps(field_values) + '\n')
             for index_data in self.opts.indices[1:]:
+                logger.debug(u'SQLInsertCompiler.execute_sql :: index: {}'.format(index_data.keys()[0]))
                 index_conf = {
                     u'index': {
                         u'_index': index_data.keys()[0],
