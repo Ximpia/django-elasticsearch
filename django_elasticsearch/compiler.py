@@ -658,6 +658,7 @@ class SQLInsertCompiler(SQLCompiler):
         # keys = res['items']['create']['_id']
         keys = map(lambda x: x['create']['_id'] if 'create' in x else x['index']['_id'], res['items'])
         logger.debug(u'SQLInsertCompiler.execute_sql :: response keys: {}'.format(keys))
+        # curl -XGET 'http://localhost:9200/djes_test/_search?q=*:*&pretty'
         return self.ops.convert_values(self.ops.value_from_db(keys[0], pk_field), pk_field)
 
 

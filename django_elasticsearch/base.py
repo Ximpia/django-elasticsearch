@@ -163,6 +163,13 @@ class DatabaseOperations(NonrelDatabaseOperations):
         if field_kind in ('ListField', 'SetField', 'DictField',):
             value = self._value_for_db_collection(value, field,
                                                   field_kind, db_type, lookup)
+
+        if field_kind in ['DateTimeField', 'TimeField']:
+            value = value.strftime("%Y-%m-%dT%H:%M:%S")
+
+        if field_kind == 'DateField':
+            value = value.strftime("%Y-%m-%d")
+
         return value
 
     def to_dict(self, instance):

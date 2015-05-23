@@ -46,8 +46,8 @@ class BaseModel(models.Model):
 
     created_on = models.DateTimeField(auto_now_add=True)
     updated_on = models.DateTimeField(auto_now=True)
-    created_by = models.ForeignKey(User, null=True, blank=True)
-    updated_by = models.ForeignKey(User, null=True, blank=True)
+    # created_by = models.ForeignKey(User, null=True, blank=True)
+    # updated_by = models.ForeignKey(User, null=True, blank=True)
 
     class Meta:
         abstract = True
