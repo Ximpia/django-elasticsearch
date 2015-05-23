@@ -590,7 +590,8 @@ class SQLInsertCompiler(SQLCompiler):
                 value = self.ops.value_for_db(value, field)
                 logger.debug(u'SQLInsertCompiler.execute_sql :: after value_for_db :: value: {}'.format(value))
                 field_values[field.column] = value
-            if hasattr(self.opts, 'disable_default_index') and self.opts.disable_default_index is False:
+            if not hasattr(self.opts, 'disable_default_index') or \
+                    (hasattr(self.opts, 'disable_default_index') and self.opts.disable_default_index is False):
                 # default index
                 logger.debug(u'SQLInsertCompiler.execute_sql :: default index')
                 default_indices = self.connection.default_indices

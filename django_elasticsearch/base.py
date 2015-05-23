@@ -685,6 +685,7 @@ class DatabaseWrapper(NonrelDatabaseWrapper):
         self.connected = False
         self.autocommit = True
         self.es_url = '{}:{}'.format(self.settings_dict['HOST'], self.settings_dict['PORT'])
+        self.default_indices = []
 
         del self.connection
 
@@ -699,6 +700,7 @@ class DatabaseWrapper(NonrelDatabaseWrapper):
                                  bulk_size=1000)
             connection_created.send(sender=self.__class__, connection=self)
             self.connected = True
+            self.default_indices = [self.settings_dict['NAME']]
 
     def __getattr__(self, attr):
         if attr == "connection":
