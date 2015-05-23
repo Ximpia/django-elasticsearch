@@ -619,7 +619,7 @@ class SQLInsertCompiler(SQLCompiler):
                 index_data = self.opts.indices[0]
                 index_conf = {
                     u'create': {
-                        u'_index': index_data.keys()[0],
+                        u'_index': "{}__{}".format(self.opts.db_table, index_data.keys()[0]),
                         u'_type': self.opts.db_table,
                         u'_id': self._get_pk(field_values),
                     }
@@ -630,9 +630,9 @@ class SQLInsertCompiler(SQLCompiler):
                     })
                 logger.debug(u'SQLInsertCompiler.execute_sql :: bulk obj: {}'.format(json.dumps(index_conf) + '\n' +
                                                                                      json.dumps(field_values) + '\n'))
-                self.connection.bulker.add(json.dumps(index_conf) + '\n' + json.dumps(field_values) + '\n')
+                self.connection.connection.bulker.add(json.dumps(index_conf) + '\n' + json.dumps(field_values) + '\n')
             # model indices
-            if hasattr(self.opts, 'indices'):
+            if hasattr(self.opts, 'indices') and len(self.opts.indices) > 1:
                 for index_data in self.opts.indices[1:]:
                     logger.debug(u'SQLInsertCompiler.execute_sql :: index: {}'.format(index_data.keys()[0]))
                     index_conf = {
@@ -658,7 +658,9 @@ class SQLInsertCompiler(SQLCompiler):
         # keys = res['items']['create']['_id']
         keys = map(lambda x: x['create']['_id'] if 'create' in x else x['index']['_id'], res['items'])
         logger.debug(u'SQLInsertCompiler.execute_sql :: response keys: {}'.format(keys))
-        # curl -XGET 'http://localhost:9200/djes_test/_search?q=*:*&pretty'
+        # curl -XGET 'http://localhost:9200/djes_test/djes_examplemodelmeta/_search?q=*:*&pretty'
+        # from djes.models import ExampleModel, ExampleModelMeta
+        # ExampleModelMeta.objects.create(name_people='I am the real thing', has_address=True, number_votes=756)
         return self.ops.convert_values(self.ops.value_from_db(keys[0], pk_field), pk_field)
 
 
