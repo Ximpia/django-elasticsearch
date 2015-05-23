@@ -606,7 +606,7 @@ class SQLInsertCompiler(SQLCompiler):
                             u'_id': self._get_pk(field_values),
                         }
                     }) + '\n' + json.dumps(field_values) + '\n'))
-                    self.connection.bulker.add(json.dumps({
+                    self.connection.connection.bulker.add(json.dumps({
                         u'create': {
                             u'_index': index,
                             u'_type': self.opts.db_table,
@@ -632,28 +632,33 @@ class SQLInsertCompiler(SQLCompiler):
                                                                                      json.dumps(field_values) + '\n'))
                 self.connection.bulker.add(json.dumps(index_conf) + '\n' + json.dumps(field_values) + '\n')
             # model indices
-            for index_data in self.opts.indices[1:]:
-                logger.debug(u'SQLInsertCompiler.execute_sql :: index: {}'.format(index_data.keys()[0]))
-                index_conf = {
-                    u'index': {
-                        u'_index': index_data.keys()[0],
-                        u'_type': self.opts.db_table,
-                        u'_id': self._get_pk(field_values),
+            if hasattr(self.opts, 'indices'):
+                for index_data in self.opts.indices[1:]:
+                    logger.debug(u'SQLInsertCompiler.execute_sql :: index: {}'.format(index_data.keys()[0]))
+                    index_conf = {
+                        u'index': {
+                            u'_index': index_data.keys()[0],
+                            u'_type': self.opts.db_table,
+                            u'_id': self._get_pk(field_values),
+                        }
                     }
-                }
-                if 'routing' in index_data:
-                    index_conf.update({
-                        u'_routing': index_data['routing']
-                    })
-                logger.debug(u'SQLInsertCompiler.execute_sql :: bulk obj: {}'.format(json.dumps(index_conf) + '\n' +
-                                                                                     json.dumps(field_values) + '\n'))
-                self.connection.bulker.add(json.dumps(index_conf) + '\n' + json.dumps(field_values) + '\n')
-        res = self.connection.bulker.flush_bulk(force=True)
+                    if 'routing' in index_data:
+                        index_conf.update({
+                            u'_routing': index_data['routing']
+                        })
+                    logger.debug(u'SQLInsertCompiler.execute_sql :: bulk obj: {}'.format(
+                        json.dumps(index_conf) + '\n' +
+                        json.dumps(field_values) + '\n'))
+                    self.connection.bulker.add(json.dumps(index_conf) + '\n' + json.dumps(field_values) + '\n')
+        res = self.connection.connection.bulker.flush_bulk(forced=True)
         # Pass the key value through normal database de-conversion.
+        logger.debug(u'SQLInsertCompiler.execute_sql :: response: {} type: {}'.format(res, type(res)))
         if return_id is False:
             return
-        key = res['items']['create']['_id']
-        return self.ops.convert_values(self.ops.value_from_db(key, pk_field), pk_field)
+        # keys = res['items']['create']['_id']
+        keys = map(lambda x: x['create']['_id'] if 'create' in x else x['index']['_id'], res['items'])
+        logger.debug(u'SQLInsertCompiler.execute_sql :: response keys: {}'.format(keys))
+        return self.ops.convert_values(self.ops.value_from_db(keys[0], pk_field), pk_field)
 
 
 class SQLUpdateCompiler(SQLCompiler):
