@@ -591,12 +591,20 @@ class SQLInsertCompiler(SQLCompiler):
                 logger.debug(u'SQLInsertCompiler.execute_sql :: after value_for_db :: value: {}'.format(value))
                 field_values[field.column] = value
             if hasattr(self.opts, 'disable_default_index') and self.opts.disable_default_index is False:
+                # default index
                 logger.debug(u'SQLInsertCompiler.execute_sql :: default index')
                 default_indices = self.connection.default_indices
                 for index in default_indices:
                     logger.debug(u'SQLInsertCompiler.execute_sql :: default index index: {}'.format(
                         index
                     ))
+                    logger.debug(u'SQLInsertCompiler.execute_sql :: bulk obj: {}'.format(json.dumps({
+                        u'create': {
+                            u'_index': index,
+                            u'_type': self.opts.db_table,
+                            u'_id': self._get_pk(field_values),
+                        }
+                    }) + '\n' + json.dumps(field_values) + '\n'))
                     self.connection.bulker.add(json.dumps({
                         u'create': {
                             u'_index': index,
@@ -605,6 +613,7 @@ class SQLInsertCompiler(SQLCompiler):
                         }
                     }) + '\n' + json.dumps(field_values) + '\n')
             else:
+                # custom general index
                 logger.debug(u'SQLInsertCompiler.execute_sql :: disable default index')
                 index_data = self.opts.indices[0]
                 index_conf = {
@@ -618,7 +627,10 @@ class SQLInsertCompiler(SQLCompiler):
                     index_conf.update({
                         u'_routing': index_data['routing']
                     })
+                logger.debug(u'SQLInsertCompiler.execute_sql :: bulk obj: {}'.format(json.dumps(index_conf) + '\n' +
+                                                                                     json.dumps(field_values) + '\n'))
                 self.connection.bulker.add(json.dumps(index_conf) + '\n' + json.dumps(field_values) + '\n')
+            # model indices
             for index_data in self.opts.indices[1:]:
                 logger.debug(u'SQLInsertCompiler.execute_sql :: index: {}'.format(index_data.keys()[0]))
                 index_conf = {
@@ -632,6 +644,8 @@ class SQLInsertCompiler(SQLCompiler):
                     index_conf.update({
                         u'_routing': index_data['routing']
                     })
+                logger.debug(u'SQLInsertCompiler.execute_sql :: bulk obj: {}'.format(json.dumps(index_conf) + '\n' +
+                                                                                     json.dumps(field_values) + '\n'))
                 self.connection.bulker.add(json.dumps(index_conf) + '\n' + json.dumps(field_values) + '\n')
         res = self.connection.bulker.flush_bulk(force=True)
         # Pass the key value through normal database de-conversion.
