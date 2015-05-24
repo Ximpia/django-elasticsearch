@@ -613,7 +613,7 @@ class SQLInsertCompiler(SQLCompiler):
                             u'_id': self._get_pk(field_values),
                         }
                     }) + '\n' + json.dumps(field_values) + '\n')
-            else:
+            if hasattr(self.opts, 'indices') and self.opts.indices:
                 # custom general index
                 logger.debug(u'SQLInsertCompiler.execute_sql :: disable default index')
                 index_data = self.opts.indices[0]
