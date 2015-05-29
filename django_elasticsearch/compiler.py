@@ -575,8 +575,13 @@ class SQLInsertCompiler(SQLCompiler):
                 # check field_kind if is related field or many to many
                 if field_kind in ['ForeignKey', 'GenericRelation', 'GenericForeignKey']:
                     # we need the model associated with field
-                    # value = self.ops.to_dict(field.rel.to)
-                    value = {}
+                    logger.debug(u'SQLInsertCompiler.execute_sql :: field_kind: {} field: {} rel: {}'.format(
+                        field_kind,
+                        field.name,
+                        field.rel.to
+                    ))
+                    value = self.ops.to_dict(field.rel.to)
+                    logger.debug(u'SQLInsertCompiler.execute_sql :: object :: value: {}'.format(value))
                 else:
                     value = field.get_db_prep_save(
                         getattr(obj, field.attname) if self.query.raw else field.pre_save(obj, obj._state.adding),

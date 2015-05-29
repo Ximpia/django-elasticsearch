@@ -175,14 +175,15 @@ class DatabaseOperations(NonrelDatabaseOperations):
     def to_dict(self, instance):
         opts = instance._meta
         data = {}
-        for f in opts.concrete_fields + opts.many_to_many:
-            if isinstance(f, ManyToManyField):
+        # for f in opts.concrete_fields + opts.many_to_many:
+        for f in opts.concrete_fields:
+            """if isinstance(f, ManyToManyField):
                 if instance.pk is None:
                     data[f.name] = []
                 else:
                     data[f.name] = list(f.value_from_object(instance).values_list('pk', flat=True))
-            else:
-                data[f.name] = f.value_from_object(instance)
+            else:"""
+            data[f.name] = f.value_from_object(instance)
         return data
 
     def _value_for_db_model(self, value, field, field_kind, db_type, lookup):
