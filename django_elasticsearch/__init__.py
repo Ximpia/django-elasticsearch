@@ -21,6 +21,7 @@ INTERNAL_INDEX = '.django_engine'
 OPERATION_DELETE_INDEX = 'delete_index'
 OPERATION_CREATE_INDEX = 'create_index'
 OPERATION_UPDATE_MAPPING = 'update_mapping'
+WRITE_QUEUE = 'write_queue'
 
 
 def get_installed_apps():

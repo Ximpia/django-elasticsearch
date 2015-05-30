@@ -52,6 +52,8 @@ else:
             return query.model._meta.fields
 
 
+from django_elasticsearch import WRITE_QUEUE
+
 __author__ = 'jorgealegre'
 
 logger = logging.getLogger(__name__)
@@ -575,8 +577,22 @@ class SQLInsertCompiler(SQLCompiler):
                     pass
         return data
 
-    def _send_queue(self, index_data):
-        pass
+    def _send_queue(self, bulk_data):
+        """
+        Send data to queue, adding to bulk
+
+        :param bulk_data: bulk data to write to queue
+        :return:
+        """
+        import base64
+        bulk_data_encoded = base64.encodestring(bulk_data)
+        queue_bulk_data = json.dumps({
+            u'create': {
+                u'_index': self.connection.default_indices[0],
+                u'_type': WRITE_QUEUE,
+            }
+        }) + '\n' + json.dumps({'data': bulk_data_encoded}) + '\n'
+        self.connection.connection.bulker.add(queue_bulk_data)
 
     def execute_sql(self, return_id=False):
         """
@@ -689,6 +705,7 @@ class SQLInsertCompiler(SQLCompiler):
                         self._send_queue(bulk_data)
                     else:
                         self.connection.connection.bulker.add(bulk_data)
+        # Writes real inserts into indices as well as dumps into queue (write_queue)
         res = self.connection.connection.bulker.flush_bulk(forced=True)
         # Pass the key value through normal database de-conversion.
         logger.debug(u'SQLInsertCompiler.execute_sql :: response: {} type: {}'.format(res, type(res)))
