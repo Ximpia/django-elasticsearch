@@ -532,41 +532,69 @@ class SQLInsertCompiler(SQLCompiler):
             pk = data[pk_column]
         return pk
 
+    def _get_internal_data(self):
+        """
+        Get internal data for insert operation
+
+        :return:
+        """
+        # TODO: make one query to ES for internal data for model and default indices
+        from mapping import model_to_mapping
+        data = {
+            'indices': {
+                'default': [
+                    {}
+                ],
+                'model': {
+                    'main': [
+                        {}
+                    ],
+                    'index': [
+                        {}
+                    ]
+                },
+            },
+            'is_blocked': False,
+        }
+        # model = self.opts.db_table
+        # default_indices = self.connection.default_indices
+        # index_data = self.opts.indices[0]
+        # indices = ["{}__{}".format(self.opts.db_table, index_data.keys()[0])]
+        # also save mapping in case needs to
+        indices = data['indices']['default'] + \
+            data['indices']['model']['main'] + \
+            data['indices']['model']['index']
+        for index_data in indices:
+            if index_data['has_mapping'] is False:
+                try:
+                    mapping = model_to_mapping(self.opts.db_table,
+                                               self.connection.connection,
+                                               index_data['index'])
+                    mapping.save()
+                except Exception:
+                    pass
+        return data
+
+    def _send_queue(self, index_data):
+        pass
+
     def execute_sql(self, return_id=False):
         """
         Execute insert statement
 
         Insert data into ElasticSearch using bulk inserts.
 
-        **Relationships**
-
-        1. Without relationships: We save data using index method in this table
-        2. Relationships
-            2.1: ForeignKey:    1. We save data and target relationship insert collection for this data.
-                                2. We fetch all the FKs in a single data query command to get target data to
-                                insert into model data. We use default index for data connection.
-            2.2: GenericRelationship: Similar to foreign key???
-        3. ManyToMany
-            3.1
-            We get collection of all items to save at this model
-            3.2
-            We insert our item into target collection
-
-        **Indexes**
-        1. We get indexes for model: default index plus all indexes for model with routing and sorting
-        2. We push bulk saving to all indexes active.
-
-        **Cases**
-
-        1. No model indexes, no routing
-        2. No model indexes, routing
-        3. Model indexes with routing
-        4. Model indexes with routing and ordering
-
         :param bool return_id:
         :return: primary key saved in case we have return_id True.
         """
+        import time
         assert not (return_id and len(self.query.objs) != 1)
+        # query internal index to get indices, like 'alias': [index1, index2]
+        # alias would be the default indices, model table name
+        internal_data = self._get_internal_data()
+        while internal_data['is_blocked']:
+            time.sleep(0.2)
+            internal_data = self._get_internal_data()
         pk_field = self.opts.pk
         for obj in self.query.objs:
             field_values = {}
@@ -599,50 +627,30 @@ class SQLInsertCompiler(SQLCompiler):
                     (hasattr(self.opts, 'disable_default_index') and self.opts.disable_default_index is False):
                 # default index
                 logger.debug(u'SQLInsertCompiler.execute_sql :: default index')
-                default_indices = self.connection.default_indices
-                for index in default_indices:
+                for index_data in internal_data['indices']['default']:
+                    bulk_data = json.dumps({
+                        u'create': {
+                            u'_index': index,
+                            u'_type': self.opts.db_table,
+                            u'_id': self._get_pk(field_values),
+                        }
+                    }) + '\n' + json.dumps(field_values) + '\n'
                     logger.debug(u'SQLInsertCompiler.execute_sql :: default index index: {}'.format(
                         index
                     ))
-                    logger.debug(u'SQLInsertCompiler.execute_sql :: bulk obj: {}'.format(json.dumps({
-                        u'create': {
-                            u'_index': index,
-                            u'_type': self.opts.db_table,
-                            u'_id': self._get_pk(field_values),
-                        }
-                    }) + '\n' + json.dumps(field_values) + '\n'))
-                    self.connection.connection.bulker.add(json.dumps({
-                        u'create': {
-                            u'_index': index,
-                            u'_type': self.opts.db_table,
-                            u'_id': self._get_pk(field_values),
-                        }
-                    }) + '\n' + json.dumps(field_values) + '\n')
+                    logger.debug(u'SQLInsertCompiler.execute_sql :: bulk obj: {}'.format(bulk_data))
+                    if index_data['rebuild_mode'] == 'building':
+                        self._send_queue(bulk_data)
+                    else:
+                        self.connection.connection.bulker.add(bulk_data)
             if hasattr(self.opts, 'indices') and self.opts.indices:
                 # custom general index
                 logger.debug(u'SQLInsertCompiler.execute_sql :: disable default index')
                 index_data = self.opts.indices[0]
-                index_conf = {
-                    u'create': {
-                        u'_index': "{}__{}".format(self.opts.db_table, index_data.keys()[0]),
-                        u'_type': self.opts.db_table,
-                        u'_id': self._get_pk(field_values),
-                    }
-                }
-                if 'routing' in index_data:
-                    index_conf.update({
-                        u'_routing': index_data['routing']
-                    })
-                logger.debug(u'SQLInsertCompiler.execute_sql :: bulk obj: {}'.format(json.dumps(index_conf) + '\n' +
-                                                                                     json.dumps(field_values) + '\n'))
-                self.connection.connection.bulker.add(json.dumps(index_conf) + '\n' + json.dumps(field_values) + '\n')
-            # model indices
-            if hasattr(self.opts, 'indices') and len(self.opts.indices) > 1:
-                for index_data in self.opts.indices[1:]:
-                    logger.debug(u'SQLInsertCompiler.execute_sql :: index: {}'.format(index_data.keys()[0]))
+                for index in internal_data['indices']['model']['main']:
                     index_conf = {
-                        u'index': {
-                            u'_index': index_data.keys()[0],
+                        u'create': {
+                            u'_index': index,
                             u'_type': self.opts.db_table,
                             u'_id': self._get_pk(field_values),
                         }
@@ -651,10 +659,36 @@ class SQLInsertCompiler(SQLCompiler):
                         index_conf.update({
                             u'_routing': index_data['routing']
                         })
-                    logger.debug(u'SQLInsertCompiler.execute_sql :: bulk obj: {}'.format(
-                        json.dumps(index_conf) + '\n' +
-                        json.dumps(field_values) + '\n'))
-                    self.connection.bulker.add(json.dumps(index_conf) + '\n' + json.dumps(field_values) + '\n')
+                    bulk_data = json.dumps(index_conf) + '\n' + \
+                        json.dumps(field_values) + '\n'
+                    logger.debug(u'SQLInsertCompiler.execute_sql :: bulk obj: {}'.format(bulk_data))
+                    if index_data['rebuild_mode'] == 'building':
+                        self._send_queue(bulk_data)
+                    else:
+                        self.connection.connection.bulker.add(bulk_data)
+            # model indices
+            if hasattr(self.opts, 'indices') and len(self.opts.indices) > 1:
+                for index_data in internal_data['indices']['model']['index']:
+                    logger.debug(u'SQLInsertCompiler.execute_sql :: index: {}'.format(index_data.keys()[0]))
+                    index = "{}__{}".format(self.opts.db_table, index_data.keys()[0])
+                    index_conf = {
+                        u'index': {
+                            u'_index': index,
+                            u'_type': self.opts.db_table,
+                            u'_id': self._get_pk(field_values),
+                        }
+                    }
+                    if 'routing' in index_data:
+                        index_conf.update({
+                            u'_routing': index_data['routing']
+                        })
+                    bulk_data = json.dumps(index_conf) + '\n' + \
+                        json.dumps(field_values) + '\n'
+                    logger.debug(u'SQLInsertCompiler.execute_sql :: bulk obj: {}'.format(bulk_data))
+                    if index_data['rebuild_mode'] == 'building':
+                        self._send_queue(bulk_data)
+                    else:
+                        self.connection.connection.bulker.add(bulk_data)
         res = self.connection.connection.bulker.flush_bulk(forced=True)
         # Pass the key value through normal database de-conversion.
         logger.debug(u'SQLInsertCompiler.execute_sql :: response: {} type: {}'.format(res, type(res)))

@@ -311,7 +311,7 @@ class DatabaseOperations(NonrelDatabaseOperations):
         if has_alias:
             es_connection.indices.add_alias(alias, index_name)
         if not skip_register:
-            self.register_index_operation(index_name, OPERATION_CREATE_INDEX, index_settings)
+            self.register_index_operation(index_name, OPERATION_CREATE_INDEX, index_settings, model=model)
         if has_alias:
             logger.info(u'index "{}" aliased "{}" created'.format(index_name, alias))
         else:
@@ -439,6 +439,16 @@ class DatabaseOperations(NonrelDatabaseOperations):
 
         1. Rebuild global index: Rebuilds whole database with all models
         2. Model rebuild: Rebuilds only model main store data and associated indexes
+
+        Sync with Rebuilt Indices
+        =========================
+        1. Starts rebuild index, we mark index at internal db with rebuild_mode: building
+        2. Add inserts and updated from time rebuild index starts to queue
+        3. End rebuild, mark rebuild_mode: syncing. This will block other save requests from a little while
+        4. Rebuild process gets requests from queue, mark indices as synced (no more data sent to queue).
+           At this time saving operations would save into new index.
+           After done, makes changes for alias to new index, delete old index. Mark index rebuild_mode: none.
+        5. Saving operations would go to new index
 
         :param alias: Index alias
 
